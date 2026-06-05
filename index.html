@@ -194,7 +194,7 @@
         }
         .dropped-tool.selected { outline: 2px dashed red; }
 
-        /* GUN BULLET PROJECTILE ELEMENT - MADE SMALLER */
+        /* GUN BULLET PROJECTILE ELEMENT */
         .bullet-projectile {
             position: absolute; width: 6px; height: 6px; background: #ffcc00; border: 1px solid black; border-radius: 50%; z-index: 98;
         }
@@ -327,7 +327,7 @@
             <input type="password" id="pub-pass" placeholder="••••••••">
             
             <div style="display:flex; gap:10px;">
-                <button class="action-btn" style="flex:1; border-color:red;" onclick="document.getElementById('publish-overlay').style.display='flex'">Cancel</button>
+                <button class="action-btn" style="flex:1; border-color:red;" onclick="document.getElementById('publish-overlay').style.display='none'">Cancel</button>
                 <button class="action-btn" style="flex:1; border-color:green;" onclick="executeProjectPublishPipeline()">Verify & Submit</button>
             </div>
         </div>
@@ -670,14 +670,18 @@
             });
         }
 
-        /* CAPTURES ALL PLAYTEST CLICKS EVEN ON OBJECTS */
+        /* FIXED INTERCEPTION BUG: Global window click handler tracks actual viewport coordinates */
         function setupMapClicksForTools() {
             window.addEventListener('mousedown', (e) => {
                 if(!isPlaytesting || !activeControlledPlayerId) return;
                 
-                // Ensure click is inside the game viewport area
-                if(!document.getElementById('viewport-container').contains(e.target)) return;
+                // Track back to view container parent to allow clicks anywhere inside viewport space
+                const viewContainer = document.getElementById('viewport-container');
+                if(!viewContainer.contains(e.target)) return;
                 
+                // Ignore clicks landing explicitly inside HUD hotbar
+                if(document.getElementById('hud-hotbar').contains(e.target)) return;
+
                 let activePlayer = playersData[activeControlledPlayerId];
                 if(activePlayer.health <= 0) return;
 
@@ -1094,7 +1098,6 @@
                     }
 
                     let hitTarget = false;
-                    // Adjusted bullet geometry size tracking to match CSS width and height (6px)
                     let pBox = { x: p.x, y: p.y, width: 6, height: 6 };
 
                     for(let pId in playersData) {
@@ -1109,7 +1112,6 @@
                         }
                     }
 
-                    // Bullets drop out instantly on environmental architecture impact (won't pass through)
                     if(!hitTarget) {
                         let obstacles = [...sceneObjects, ...hammerBlocks];
                         for(let j = obstacles.length - 1; j >= 0; j--) {
@@ -1356,8 +1358,9 @@
             el.className = `editor-obj shape-${obj.shape}`;
 
             el.addEventListener('mousedown', (e) => {
-                e.stopPropagation();
+                // Allows click event to safely trickle down to general weapon logic during playtest
                 if(isPlaytesting) return;
+                e.stopPropagation();
                 selectObjectTarget(obj);
                 if(activeToolState === 'move') initiateTransformDrag(e, null);
             });
