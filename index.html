@@ -204,20 +204,20 @@
         .tool-overlay-node {
             position: absolute; width: 42px; height: 42px;
             background-size: contain; background-repeat: no-repeat;
-            bottom: 12px; z-index: 96;
+            bottom: 15px; z-index: 96;
             transform-origin: bottom center;
             transition: transform 0.05s ease-out;
             display: none;
         }
         
-        /* Identical structural positioning anchors mirrored cleanly with scale transforms */
+        /* Pulled weapon closer to body to fix floating look */
         .tool-overlay-node.pos-right {
-            left: 42px;
-            transform: rotate(35deg);
+            left: 32px;
+            transform: rotate(25deg);
         }
         .tool-overlay-node.pos-left {
-            left: -9px;
-            transform: scaleX(-1) rotate(35deg);
+            left: 1px;
+            transform: scaleX(-1) rotate(25deg);
         }
 
         .health-bar-container { position: absolute; top: -15px; left: 7px; width: 60px; height: 6px; border: 1px solid black; background: red; }
@@ -307,7 +307,7 @@
             <input type="password" id="pub-pass" placeholder="••••••••">
             
             <div style="display:flex; gap:10px;">
-                <button class="action-btn" style="flex:1; border-color:red;" onclick="document.getElementById('publish-overlay').style.display='none'">Cancel</button>
+                <button class="action-btn" style="flex:1; border-color:red;" onclick="document.getElementById('publish-overlay').style.display='flex'">Cancel</button>
                 <button class="action-btn" style="flex:1; border-color:green;" onclick="executeProjectPublishPipeline()">Verify & Submit</button>
             </div>
         </div>
@@ -888,13 +888,13 @@
                     node.style.display = "block";
                     node.style.backgroundImage = `url('${pData.selectedTool}.png')`;
                     
-                    // Fixed rotation mapping from bottom origin to handle true mirroring flawlessly
+                    // Controlled standard positioning base
                     if(pData.facingDirection === 'left') {
                         node.className = "tool-overlay-node pos-left";
-                        node.style.transform = "scaleX(-1) rotate(35deg)";
+                        node.style.transform = "scaleX(-1) rotate(25deg)";
                     } else {
                         node.className = "tool-overlay-node pos-right";
-                        node.style.transform = "rotate(35deg)";
+                        node.style.transform = "rotate(25deg)";
                     }
                 } else {
                     node.style.display = "none";
@@ -908,9 +908,9 @@
 
             let node = document.getElementById(`wield_node_${attacker.id}`);
             if(node) {
-                // Slashes correctly sweeping downwards using the handle origin point
-                let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(-45deg)" : "rotate(115deg)";
-                let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
+                // Fixed rotation ranges: right tilts cleanly forward, left reverses correctly to account for scaleX flip
+                let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(95deg)" : "rotate(95deg)";
+                let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(25deg)" : "rotate(25deg)";
                 
                 node.style.transform = targetAngle;
                 setTimeout(() => { 
