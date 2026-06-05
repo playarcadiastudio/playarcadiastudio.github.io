@@ -162,7 +162,7 @@
             position: absolute;
             box-sizing: border-box;
             background-repeat: repeat !important;
-            background-size: 40px 40px !important;
+            background-size: 120px 120px !important; /* Increased texture mapping resolution scale */
         }
         .editor-obj.selected {
             outline: 2px dashed black;
@@ -232,12 +232,12 @@
             cursor: move; z-index: 110;
         }
 
-        /* RENDER CHARACTER PNG VIA BACKDROP */
+        /* ENLARGED CHARACTER PNG MATRIX */
         #studio-character {
             position: absolute;
-            width: 40px; 
-            height: 40px;
-            background-image: url('Character.png'); /* Capitalized to match exact asset name */
+            width: 60px; /* Expanded scaling aspect size width */
+            height: 60px; /* Expanded scaling aspect size height */
+            background-image: url('Character.png');
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center;
@@ -885,8 +885,9 @@
                 document.getElementById('btn-playtest').style.borderColor = "red";
                 document.getElementById('btn-playtest').style.color = "red";
                 
-                spawnPointCoords.x = spawnObj.left + (spawnObj.width / 2) - 20;
-                spawnPointCoords.y = spawnObj.top + (spawnObj.height / 2) - 20;
+                // Spawn target math adjusted from center offsets of 20 to 30 to account for 60px frame scale tracking
+                spawnPointCoords.x = spawnObj.left + (spawnObj.width / 2) - 30;
+                spawnPointCoords.y = spawnObj.top + (spawnObj.height / 2) - 30;
                 
                 playerCoords.x = spawnPointCoords.x;
                 playerCoords.y = spawnPointCoords.y;
@@ -935,7 +936,8 @@
                         advanceLinearNodeTrack(obj, 0.016);
                         updateObjectElementPositionDOM(obj);
                         
-                        if(obj.collide && checkAABBCollision({x: playerCoords.x, y: playerCoords.y + 2, width: 40, height: 40}, obj)) {
+                        // Width/Height constraints tracking increased from 40 to 60
+                        if(obj.collide && checkAABBCollision({x: playerCoords.x, y: playerCoords.y + 2, width: 60, height: 60}, obj)) {
                             nextX += (obj.left - oldL);
                             nextY += (obj.top - oldT);
                         }
@@ -944,13 +946,13 @@
 
                 let limit = totalMapMeters * meterScaleFactor;
                 if(nextX < 0) nextX = 0; if(nextY < 0) nextY = 0;
-                if(nextX > limit - 40) nextX = limit - 40; if(nextY > limit - 40) nextY = limit - 40;
+                if(nextX > limit - 60) nextX = limit - 60; if(nextY > limit - 60) nextY = limit - 60;
 
                 let hitH = false, hitV = false;
                 sceneObjects.forEach(obj => {
                     if(!obj.collide || obj.type === 'spawn') return; 
-                    if(checkAABBCollision({x: nextX, y: playerCoords.y, width: 40, height: 40}, obj)) hitH = true;
-                    if(checkAABBCollision({x: playerCoords.x, y: nextY, width: 40, height: 40}, obj)) hitV = true;
+                    if(checkAABBCollision({x: nextX, y: playerCoords.y, width: 60, height: 60}, obj)) hitH = true;
+                    if(checkAABBCollision({x: playerCoords.x, y: nextY, width: 60, height: 60}, obj)) hitV = true;
                 });
 
                 if(!hitH) playerCoords.x = nextX;
@@ -963,7 +965,7 @@
                 }
 
                 sceneObjects.forEach(obj => {
-                    if(obj.type === 'kill' && checkAABBCollision({x: playerCoords.x, y: playerCoords.y, width: 40, height: 40}, obj)) {
+                    if(obj.type === 'kill' && checkAABBCollision({x: playerCoords.x, y: playerCoords.y, width: 60, height: 60}, obj)) {
                         clearInterval(playtestPhysicsLoop);
                         document.getElementById('death-screen').style.display = "flex";
                     }
