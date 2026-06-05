@@ -294,7 +294,7 @@
             <br>
             <label>Map Dimensions (Meters):</label>
             <input type="number" id="map-size-input" value="40" min="10" max="200">
-            <button class="action-btn" onclick="initializeStudioWorkspace()" style="width:100%;">Create Environment</button>
+            <button class="action-btn" onclick="initializeStudioWorkspace()" style="width:100%;">Create</button>
             <br><br><hr><br>
             <label>Load from String:</label>
             <input type="text" id="load-string-input" placeholder="Paste saved layout here">
@@ -303,7 +303,7 @@
     </div>
 
     <div id="toolbar">
-        <span style="font-weight: bold; border-right: 2px solid black; padding-right: 15px;">STUDIO</span>
+        <span style="font-weight: bold; border-right: 2px solid black; padding-right: 15px;">Studio</span>
         
         <button id="btn-tool-move" class="tool-btn-pkg active" onclick="setActiveTool('move')">
             <img src="move.png" alt="Move">
@@ -326,7 +326,7 @@
     <div id="workspace">
         <div id="left-panel">
             <div class="tab-headers">
-                <button class="tab-btn active" onclick="switchTab('basic')">Geometry</button>
+                <button class="tab-btn active" onclick="switchTab('basic')">Basic</button>
                 <button class="tab-btn" onclick="switchTab('scripted')">Logic</button>
             </div>
             
@@ -338,7 +338,7 @@
             </div>
 
             <div id="tab-scripted" class="tab-content">
-                <div class="asset-card" onclick="spawnMapElement('kill')">+ Hazard Kill Brick</div>
+                <div class="asset-card" onclick="spawnMapElement('kill')">+ Kill Brick</div>
                 <div class="asset-card" onclick="spawnMapElement('moving')">+ Moving Block</div>
             </div>
         </div>
@@ -348,7 +348,7 @@
                 <div id="map-grid">
                     <div id="studio-character" onclick="selectCharacterTarget(event)"></div>
                     <div id="death-screen">
-                        <h1>Wasted</h1>
+                        <h1>You Died</h1>
                         <br>
                         <button class="action-btn" onclick="respawnPlaytestCharacter()">Respawn</button>
                     </div>
@@ -379,14 +379,14 @@
                 </div>
 
                 <div id="prop-field-color">
-                    <label>Base Layer Solid Color:</label>
+                    <label>Color:</label>
                     <input type="color" id="prop-color" oninput="updateSelectedObjectProperties()">
                 </div>
 
                 <div id="prop-field-collision">
                     <label>Collision State:</label>
                     <select id="prop-collide" onchange="updateSelectedObjectProperties()">
-                        <option value="true">Solid Environment Wall</option>
+                        <option value="true">Collision</option>
                         <option value="false">No Collision</option>
                     </select>
                 </div>
