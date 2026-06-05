@@ -147,10 +147,19 @@
         #camera-space.smooth-track { transition: transform 0.1s ease-out; }
         #map-grid { background: white; border: 3px solid black; position: relative; image-rendering: pixelated; }
 
-        /* GEOMETRY CORE GENERATORS */
+        /* GEOMETRY CORE GENERATORS & TEXTURES */
         .editor-obj { position: absolute; box-sizing: border-box; background-repeat: repeat !important; background-size: 40px 40px !important; }
         .editor-obj.selected { outline: 2px dashed black !important; outline-offset: 2px; }
         
+        /* Material Texture Assignments */
+        .editor-obj.mat-plastic { background-image: none; }
+        .editor-obj.mat-grass { background-image: url('grass.png'); }
+        .editor-obj.mat-brick { background-image: url('brick.png'); }
+        .editor-obj.mat-stone { background-image: url('stone.png'); }
+        .editor-obj.mat-wood { background-image: url('wood.png'); }
+        .editor-obj.mat-sand { background-image: url('sand.png'); }
+        .editor-obj.mat-metal { background-image: url('metal.png'); }
+
         .shape-cube { border: 2px solid black; }
         .shape-circle { border: 2px solid black; border-radius: 50%; }
         .shape-wedge { border: none !important; background: transparent !important; }
@@ -158,8 +167,8 @@
         .shape-arch { border: 2px solid black; border-bottom: none; border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
         .shape-octagon { border: none !important; background: transparent !important; }
 
-        .obj-spawn { border: 2px dashed green; background: rgba(0,255,0,0.15); }
-        .obj-kill { border: 2px solid red; background: rgba(255,0,0,0.2); }
+        .obj-spawn { border: 2px dashed green; background: rgba(0,255,0,0.15) !important; background-image: none !important; }
+        .obj-kill { border: 2px solid red; background: rgba(255,0,0,0.2) !important; background-image: none !important; }
         .obj-spinning { border: 2px solid purple; }
 
         .dropped-tool {
@@ -184,27 +193,31 @@
         .node-dot-a { background: #00ff55; }
         .node-dot-b { background: #ff0055; }
 
-        /* CHARACTERS & WIELDABLES (Character is 75px, hand layer offsets calibrated uniformly) */
+        /* CHARACTERS & WIELDABLES */
         .player-character {
             position: absolute; width: 75px; height: 75px;
             background-image: url('Character.png'); background-size: contain;
             background-repeat: no-repeat; background-position: center; z-index: 95;
         }
+        
+        /* Weapon overlay setup with corrected bottom handle pivot point */
         .tool-overlay-node {
             position: absolute; width: 42px; height: 42px;
             background-size: contain; background-repeat: no-repeat;
-            bottom: 4px; display: none; z-index: 96;
+            bottom: 12px; z-index: 96;
+            transform-origin: bottom center;
             transition: transform 0.05s ease-out;
+            display: none;
         }
         
-        /* Specific directional layout classes using absolute left positions to keep offsets mirror-accurate */
+        /* Identical structural positioning anchors mirrored cleanly with scale transforms */
         .tool-overlay-node.pos-right {
             left: 42px;
-            transform-origin: bottom center;
+            transform: rotate(35deg);
         }
         .tool-overlay-node.pos-left {
             left: -9px;
-            transform-origin: bottom center;
+            transform: scaleX(-1) rotate(35deg);
         }
 
         .health-bar-container { position: absolute; top: -15px; left: 7px; width: 60px; height: 6px; border: 1px solid black; background: red; }
@@ -405,6 +418,8 @@
                         <option value="brick">Brick</option>
                         <option value="stone">Stone</option>
                         <option value="wood">Wood</option>
+                        <option value="sand">Sand</option>
+                        <option value="metal">Metal</option>
                     </select>
                 </div>
 
@@ -466,7 +481,6 @@
         let playersData = {};
         let activeControlledPlayerId = null;
 
-        // Hammer Cooldown Tracker Configuration
         let hammerCooldownTimer = 0;
         let hammerCooldownInterval = null;
 
@@ -874,13 +888,13 @@
                     node.style.display = "block";
                     node.style.backgroundImage = `url('${pData.selectedTool}.png')`;
                     
-                    // Fixed position anchors and matching rotations to eliminate visual clipping/dislocations
+                    // Fixed rotation mapping from bottom origin to handle true mirroring flawlessly
                     if(pData.facingDirection === 'left') {
                         node.className = "tool-overlay-node pos-left";
-                        node.style.transform = "rotate(-45deg)";
+                        node.style.transform = "scaleX(-1) rotate(35deg)";
                     } else {
                         node.className = "tool-overlay-node pos-right";
-                        node.style.transform = "rotate(45deg)";
+                        node.style.transform = "rotate(35deg)";
                     }
                 } else {
                     node.style.display = "none";
@@ -894,8 +908,9 @@
 
             let node = document.getElementById(`wield_node_${attacker.id}`);
             if(node) {
-                let targetAngle = (attacker.facingDirection === 'left') ? "rotate(90deg)" : "rotate(-90deg)";
-                let baseAngle = (attacker.facingDirection === 'left') ? "rotate(-45deg)" : "rotate(45deg)";
+                // Slashes correctly sweeping downwards using the handle origin point
+                let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(-45deg)" : "rotate(115deg)";
+                let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
                 
                 node.style.transform = targetAngle;
                 setTimeout(() => { 
