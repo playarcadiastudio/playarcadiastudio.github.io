@@ -185,7 +185,7 @@
         .mat-sand { background-image: url('sand.png'); }
         .mat-metal { background-image: url('metal.png'); }
 
-        .obj-spawn { border: 2px dashed green; background: rgba(0,255,0,0.1); }
+        .obj-spawn { border: 2px dashed green; background: rgba(0,255,0,0.15); z-index: 1; }
         .obj-kill { border: 2px solid red; background: rgba(255,0,0,0.2); }
 
         /* 4-SIDE SCALE EDGE HANDLES */
@@ -235,12 +235,15 @@
         /* RENDER CHARACTER PNG VIA BACKDROP */
         #studio-character {
             position: absolute;
-            width: 40px; height: 40px;
-            background-image: url('character.png');
-            background-size: cover;
+            width: 40px; 
+            height: 40px;
+            background-image: url('Character.png'); /* Capitalized to match exact asset name */
+            background-size: contain;
+            background-repeat: no-repeat;
             background-position: center;
             cursor: pointer;
-            z-index: 90;
+            z-index: 95;
+            display: block;
         }
 
         #right-panel {
@@ -609,7 +612,6 @@
                 renderNodeMarkersDOM(obj);
             }
 
-            // APPEND SPECIALIZED CONTROLS DEPENDING ON ACTIVATED TOOL
             if(!isPlaytesting) {
                 if(activeToolState === 'scale') {
                     appendScaleHandlesDOM(el);
@@ -632,7 +634,6 @@
             });
         }
 
-        // CREATES INTERACTIVE VIEWPORT ROTATION BUTTON CONTROL
         function appendRotateHandleDOM(parentEl) {
             const line = document.createElement('div');
             line.className = 'rotate-line';
@@ -649,7 +650,6 @@
             parentEl.appendChild(handle);
         }
 
-        // INTERACTIVE MOUSE ANGLE CALCULATOR HOOK
         function initiateMouseRotation(e) {
             if(!selectedObjectTarget) return;
             isRotatingObj = true;
@@ -657,11 +657,9 @@
             const el = document.getElementById(selectedObjectTarget.id);
             const rect = el.getBoundingClientRect();
             
-            // Calculate screen center point of target block
             centerPointX = rect.left + rect.width / 2;
             centerPointY = rect.top + rect.height / 2;
             
-            // Get initial cursor-to-center angle coordinates
             let rad = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX);
             startAngle = rad * (180 / Math.PI);
             baseRotation = selectedObjectTarget.rotation;
@@ -875,17 +873,20 @@
 
         function togglePlaytestMode() {
             if(!isPlaytesting) {
+                let spawnObj = sceneObjects.find(o => o.type === 'spawn');
+                if(!spawnObj) {
+                    alert("You need a spawn pad!");
+                    return;
+                }
+
                 clearSelectionStates();
                 isPlaytesting = true;
                 document.getElementById('btn-playtest').textContent = "Stop Test";
                 document.getElementById('btn-playtest').style.borderColor = "red";
                 document.getElementById('btn-playtest').style.color = "red";
                 
-                let spawnObj = sceneObjects.find(o => o.type === 'spawn');
-                if(spawnObj) {
-                    spawnPointCoords.x = spawnObj.left + (spawnObj.width / 2) - 20;
-                    spawnPointCoords.y = spawnObj.top + (spawnObj.height / 2) - 20;
-                }
+                spawnPointCoords.x = spawnObj.left + (spawnObj.width / 2) - 20;
+                spawnPointCoords.y = spawnObj.top + (spawnObj.height / 2) - 20;
                 
                 playerCoords.x = spawnPointCoords.x;
                 playerCoords.y = spawnPointCoords.y;
@@ -947,7 +948,7 @@
 
                 let hitH = false, hitV = false;
                 sceneObjects.forEach(obj => {
-                    if(!obj.collide) return;
+                    if(!obj.collide || obj.type === 'spawn') return; 
                     if(checkAABBCollision({x: nextX, y: playerCoords.y, width: 40, height: 40}, obj)) hitH = true;
                     if(checkAABBCollision({x: playerCoords.x, y: nextY, width: 40, height: 40}, obj)) hitV = true;
                 });
@@ -956,8 +957,10 @@
                 if(!hitV) playerCoords.y = nextY;
 
                 const char = document.getElementById('studio-character');
-                char.style.left = playerCoords.x + "px";
-                char.style.top = playerCoords.y + "px";
+                if(char) {
+                    char.style.left = playerCoords.x + "px";
+                    char.style.top = playerCoords.y + "px";
+                }
 
                 sceneObjects.forEach(obj => {
                     if(obj.type === 'kill' && checkAABBCollision({x: playerCoords.x, y: playerCoords.y, width: 40, height: 40}, obj)) {
