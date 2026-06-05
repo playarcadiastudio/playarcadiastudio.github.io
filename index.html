@@ -200,7 +200,7 @@
             background-repeat: no-repeat; background-position: center; z-index: 95;
         }
         
-        /* Weapon overlay setup with corrected bottom handle pivot point */
+        /* Weapon overlay setup with pivot set specifically to weapon handle base */
         .tool-overlay-node {
             position: absolute; width: 42px; height: 42px;
             background-size: contain; background-repeat: no-repeat;
@@ -210,14 +210,14 @@
             display: none;
         }
         
-        /* Pulled weapon closer to body to fix floating look */
+        /* Shifted coordinates slightly outward to rest perfectly in the hand line */
         .tool-overlay-node.pos-right {
-            left: 32px;
-            transform: rotate(25deg);
+            left: 42px;
+            transform: rotate(35deg);
         }
         .tool-overlay-node.pos-left {
-            left: 1px;
-            transform: scaleX(-1) rotate(25deg);
+            left: -8px;
+            transform: scaleX(-1) rotate(35deg);
         }
 
         .health-bar-container { position: absolute; top: -15px; left: 7px; width: 60px; height: 6px; border: 1px solid black; background: red; }
@@ -891,10 +891,10 @@
                     // Controlled standard positioning base
                     if(pData.facingDirection === 'left') {
                         node.className = "tool-overlay-node pos-left";
-                        node.style.transform = "scaleX(-1) rotate(25deg)";
+                        node.style.transform = "scaleX(-1) rotate(35deg)";
                     } else {
                         node.className = "tool-overlay-node pos-right";
-                        node.style.transform = "rotate(25deg)";
+                        node.style.transform = "rotate(35deg)";
                     }
                 } else {
                     node.style.display = "none";
@@ -908,9 +908,9 @@
 
             let node = document.getElementById(`wield_node_${attacker.id}`);
             if(node) {
-                // Fixed rotation ranges: right tilts cleanly forward, left reverses correctly to account for scaleX flip
-                let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(95deg)" : "rotate(95deg)";
-                let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(25deg)" : "rotate(25deg)";
+                // Extended smooth rotation arcs using the newly updated hand pivots
+                let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(105deg)" : "rotate(105deg)";
+                let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
                 
                 node.style.transform = targetAngle;
                 setTimeout(() => { 
