@@ -194,9 +194,9 @@
         }
         .dropped-tool.selected { outline: 2px dashed red; }
 
-        /* GUN BULLET PROJECTILE ELEMENT */
+        /* GUN BULLET PROJECTILE ELEMENT - MADE SMALLER */
         .bullet-projectile {
-            position: absolute; width: 10px; height: 10px; background: #ffcc00; border: 1px solid black; border-radius: 50%; z-index: 98;
+            position: absolute; width: 6px; height: 6px; background: #ffcc00; border: 1px solid black; border-radius: 50%; z-index: 98;
         }
 
         /* SCALE NODES */
@@ -512,6 +512,7 @@
 
         let hammerCooldownTimer = 0;
         let hammerCooldownInterval = null;
+        let gunCooldownTimer = 0;
 
         let camX = 50, camY = 50, currentZoomScale = 1.0;
         let editorCamSpeed = 8;
@@ -574,6 +575,10 @@
                     if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { camX += editorCamSpeed; camMoved = true; }
                     if (keyLayoutState['d'] || keyLayoutState['arrowright']) { camX -= editorCamSpeed; camMoved = true; }
                     if (camMoved) updateCameraTransformDOM();
+                }
+
+                if (isPlaytesting && gunCooldownTimer > 0) {
+                    gunCooldownTimer -= 0.016;
                 }
 
                 sceneObjects.forEach(obj => {
@@ -665,9 +670,14 @@
             });
         }
 
+        /* CAPTURES ALL PLAYTEST CLICKS EVEN ON OBJECTS */
         function setupMapClicksForTools() {
-            document.getElementById('map-grid').addEventListener('mousedown', (e) => {
+            window.addEventListener('mousedown', (e) => {
                 if(!isPlaytesting || !activeControlledPlayerId) return;
+                
+                // Ensure click is inside the game viewport area
+                if(!document.getElementById('viewport-container').contains(e.target)) return;
+                
                 let activePlayer = playersData[activeControlledPlayerId];
                 if(activePlayer.health <= 0) return;
 
@@ -676,17 +686,13 @@
                 let clickY = (e.clientY - rect.top) / currentZoomScale;
 
                 if(activePlayer.selectedTool === 'hammer') {
-                    e.stopPropagation();
                     if (hammerCooldownTimer > 0) return; 
-                    
                     buildHammerBlockAtClickLocation(clickX, clickY);
                     triggerHeldToolSlashEffect();
                     startHammerCooldownSequence();
                 } else if(activePlayer.selectedTool === 'gun') {
-                    e.stopPropagation();
                     fireRangedGunBullet(clickX, clickY);
                 } else if(activePlayer.selectedTool === 'sword') {
-                    e.stopPropagation();
                     triggerActivePlayerAttack();
                 }
             });
@@ -808,6 +814,7 @@
                 simulatePlayerCount = Math.max(1, Math.min(10, parseInt(document.getElementById('mp-spawn-count').value) || 1));
                 clearSelectionStates();
                 isPlaytesting = true;
+                gunCooldownTimer = 0;
                 
                 document.getElementById('camera-space').classList.add('smooth-track');
                 document.getElementById('btn-playtest').textContent = "Stop Test";
@@ -864,6 +871,7 @@
             } else {
                 isPlaytesting = false;
                 hammerCooldownTimer = 0;
+                gunCooldownTimer = 0;
                 if(hammerCooldownInterval) clearInterval(hammerCooldownInterval);
                 document.getElementById('hammer-cooldown-indicator').style.display = "none";
 
@@ -952,6 +960,17 @@
 
             let node = document.getElementById(`wield_node_${attacker.id}`);
             if(node) {
+                if(attacker.selectedTool === 'gun') {
+                    let recoilTrans = (attacker.facingDirection === 'left') ? "scaleX(-1) translate(6px, 4px) rotate(15deg)" : "translate(-6px, 4px) rotate(15deg)";
+                    let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
+                    
+                    node.style.transform = recoilTrans;
+                    setTimeout(() => { 
+                        if(attacker.selectedTool === 'gun') node.style.transform = baseAngle; 
+                    }, 80);
+                    return;
+                }
+
                 let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(105deg)" : "rotate(105deg)";
                 let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
                 
@@ -1023,14 +1042,17 @@
         function fireRangedGunBullet(targetX, targetY) {
             let shooter = playersData[activeControlledPlayerId];
             if(!shooter || shooter.health <= 0) return;
+            
+            if (gunCooldownTimer > 0) return;
 
             triggerHeldToolSlashEffect();
+            gunCooldownTimer = 0.5;
 
             objectIdCounter++;
             let bId = "bullet_" + objectIdCounter;
 
-            let startX = shooter.x + 37.5;
-            let startY = shooter.y + 37.5;
+            let startX = shooter.x + (shooter.facingDirection === 'left' ? 10 : 65);
+            let startY = shooter.y + 42; 
 
             let angle = Math.atan2(targetY - startY, targetX - startX);
             let speed = 12;
@@ -1059,7 +1081,7 @@
                 let speed = 5 * meterScaleFactor * 0.016;
                 let activeUser = playersData[activeControlledPlayerId];
 
-                /* ADVANCE RANGED PROJECTILES */
+                /* ADVANCE RANGED PROJECTILES & COLLISION DETECTION */
                 for(let i = activeProjectilesList.length - 1; i >= 0; i--) {
                     let p = activeProjectilesList[i];
                     p.x += p.vx;
@@ -1072,9 +1094,9 @@
                     }
 
                     let hitTarget = false;
-                    let pBox = { x: p.x, y: p.y, width: 10, height: 10 };
+                    // Adjusted bullet geometry size tracking to match CSS width and height (6px)
+                    let pBox = { x: p.x, y: p.y, width: 6, height: 6 };
 
-                    // Collision checking vs other players
                     for(let pId in playersData) {
                         if(pId === p.ownerId) continue;
                         let targetPlayer = playersData[pId];
@@ -1087,7 +1109,7 @@
                         }
                     }
 
-                    // Collision checking vs environmental architecture/hammer items
+                    // Bullets drop out instantly on environmental architecture impact (won't pass through)
                     if(!hitTarget) {
                         let obstacles = [...sceneObjects, ...hammerBlocks];
                         for(let j = obstacles.length - 1; j >= 0; j--) {
@@ -1240,8 +1262,19 @@
 
         function triggerActivePlayerAttack() {
             let attacker = playersData[activeControlledPlayerId];
-            if(!attacker || attacker.health <= 0 || attacker.selectedTool !== 'sword') return;
+            if(!attacker || attacker.health <= 0) return;
 
+            if(attacker.selectedTool === 'gun') {
+                let trackingEl = document.getElementById("char_" + attacker.id);
+                if(trackingEl) {
+                    let aimX = attacker.x + (attacker.facingDirection === 'left' ? -200 : 275);
+                    let aimY = attacker.y + 42;
+                    fireRangedGunBullet(aimX, aimY);
+                }
+                return;
+            }
+
+            if(attacker.selectedTool !== 'sword') return;
             triggerHeldToolSlashEffect();
 
             for(let pId in playersData) {
