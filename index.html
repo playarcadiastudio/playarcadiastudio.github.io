@@ -194,6 +194,11 @@
         }
         .dropped-tool.selected { outline: 2px dashed red; }
 
+        /* GUN BULLET PROJECTILE ELEMENT */
+        .bullet-projectile {
+            position: absolute; width: 10px; height: 10px; background: #ffcc00; border: 1px solid black; border-radius: 50%; z-index: 98;
+        }
+
         /* SCALE NODES */
         .scale-handle { position: absolute; width: 16px; height: 16px; background: #00e1ff; border: 2px solid black; border-radius: 50% !important; z-index: 110; }
         .handle-t { top: -9px; left: calc(50% - 8px); cursor: ns-resize; }
@@ -386,6 +391,7 @@
             <div id="tab-tools" class="tab-content">
                 <div class="asset-card" onclick="spawnToolElement('sword')">+ Spawn Sword</div>
                 <div class="asset-card" onclick="spawnToolElement('hammer')">+ Spawn Hammer</div>
+                <div class="asset-card" onclick="spawnToolElement('gun')">+ Spawn Gun</div>
             </div>
         </div>
 
@@ -401,6 +407,7 @@
                     <svg id="path-visualizer-canvas" class="path-line-svg"></svg>
                     <div id="players-layer"></div>
                     <div id="path-nodes-layer"></div>
+                    <div id="projectiles-layer"></div>
                 </div>
             </div>
 
@@ -492,6 +499,7 @@
         let sceneObjects = [];
         let droppedTools = [];
         let hammerBlocks = [];
+        let activeProjectilesList = [];
         let objectIdCounter = 0;
         
         let selectedObjectTarget = null;
@@ -637,6 +645,11 @@
                         renderInventoryHotbarHUD();
                         syncHeldToolVisualsDOM();
                     }
+                    if(lowerKey === '3' && activePlayer.inventory[2]) {
+                        activePlayer.selectedTool = activePlayer.inventory[2];
+                        renderInventoryHotbarHUD();
+                        syncHeldToolVisualsDOM();
+                    }
                     if(lowerKey === ' ' || lowerKey === 'f') {
                         triggerActivePlayerAttack();
                     }
@@ -669,6 +682,9 @@
                     buildHammerBlockAtClickLocation(clickX, clickY);
                     triggerHeldToolSlashEffect();
                     startHammerCooldownSequence();
+                } else if(activePlayer.selectedTool === 'gun') {
+                    e.stopPropagation();
+                    fireRangedGunBullet(clickX, clickY);
                 } else if(activePlayer.selectedTool === 'sword') {
                     e.stopPropagation();
                     triggerActivePlayerAttack();
@@ -865,6 +881,9 @@
                 hammerBlocks.forEach(b => document.getElementById(b.id)?.remove());
                 hammerBlocks = [];
 
+                activeProjectilesList.forEach(p => document.getElementById(p.id)?.remove());
+                activeProjectilesList = [];
+
                 camX = 50; camY = 50; currentZoomScale = 1.0;
                 updateCameraTransformDOM();
             }
@@ -1001,10 +1020,96 @@
             return true;
         }
 
+        function fireRangedGunBullet(targetX, targetY) {
+            let shooter = playersData[activeControlledPlayerId];
+            if(!shooter || shooter.health <= 0) return;
+
+            triggerHeldToolSlashEffect();
+
+            objectIdCounter++;
+            let bId = "bullet_" + objectIdCounter;
+
+            let startX = shooter.x + 37.5;
+            let startY = shooter.y + 37.5;
+
+            let angle = Math.atan2(targetY - startY, targetX - startX);
+            let speed = 12;
+
+            let proj = {
+                id: bId,
+                x: startX,
+                y: startY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                ownerId: shooter.id
+            };
+
+            activeProjectilesList.push(proj);
+
+            let el = document.createElement('div');
+            el.id = bId;
+            el.className = "bullet-projectile";
+            el.style.left = proj.x + "px";
+            el.style.top = proj.y + "px";
+            document.getElementById('projectiles-layer').appendChild(el);
+        }
+
         function runPlaytestPhysicsLoop() {
             playtestPhysicsLoop = setInterval(() => {
                 let speed = 5 * meterScaleFactor * 0.016;
                 let activeUser = playersData[activeControlledPlayerId];
+
+                /* ADVANCE RANGED PROJECTILES */
+                for(let i = activeProjectilesList.length - 1; i >= 0; i--) {
+                    let p = activeProjectilesList[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    let pEl = document.getElementById(p.id);
+                    if(pEl) {
+                        pEl.style.left = p.x + "px";
+                        pEl.style.top = p.y + "px";
+                    }
+
+                    let hitTarget = false;
+                    let pBox = { x: p.x, y: p.y, width: 10, height: 10 };
+
+                    // Collision checking vs other players
+                    for(let pId in playersData) {
+                        if(pId === p.ownerId) continue;
+                        let targetPlayer = playersData[pId];
+                        if(targetPlayer.health > 0) {
+                            if(p.x >= targetPlayer.x && p.x <= targetPlayer.x + 75 && p.y >= targetPlayer.y && p.y <= targetPlayer.y + 75) {
+                                damagePlayerTarget(targetPlayer, 20);
+                                hitTarget = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Collision checking vs environmental architecture/hammer items
+                    if(!hitTarget) {
+                        let obstacles = [...sceneObjects, ...hammerBlocks];
+                        for(let j = obstacles.length - 1; j >= 0; j--) {
+                            let obj = obstacles[j];
+                            if(obj.type === 'spawn') continue;
+                            if(checkShapeSpecificCollision(pBox, obj.shape || 'cube', obj)) {
+                                hitTarget = true;
+                                if(hammerBlocks.includes(obj)) {
+                                    document.getElementById(obj.id)?.remove();
+                                    hammerBlocks.splice(hammerBlocks.indexOf(obj), 1);
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    let limit = totalMapMeters * meterScaleFactor;
+                    if(hitTarget || p.x < 0 || p.x > limit || p.y < 0 || p.y > limit) {
+                        document.getElementById(p.id)?.remove();
+                        activeProjectilesList.splice(i, 1);
+                    }
+                }
 
                 if(activeUser && activeUser.health > 0) {
                     let nextX = activeUser.x;
@@ -1254,7 +1359,6 @@
                     </svg>
                 `;
             } else if(obj.shape === 'sign') {
-                // Dynamically computes standard font bounds relative to current scale box height
                 let approxFontSize = Math.max(10, Math.min(obj.height * 0.35, obj.width * 0.15));
                 el.innerHTML = `<span style="font-size: ${approxFontSize}px;"></span>`;
                 el.querySelector('span').textContent = obj.text || '';
