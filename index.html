@@ -140,17 +140,30 @@
             background: #e0e0e0;
             position: relative;
             overflow: hidden;
-            cursor: grab;
         }
-        #viewport-container:active {
-            cursor: grabbing;
+        
+        /* PLAYTEST PLAY OF VIEW FOG VIGNETTE */
+        #playtest-fog {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 90;
+            background: radial-gradient(circle, transparent 150px, rgba(0, 0, 0, 0.85) 350px);
+            display: none;
         }
+
         #camera-space {
             position: absolute;
             top: 0;
             left: 0;
             transform-origin: 0 0;
         }
+        
+        /* Smooth lerping for playtest tracking */
+        #camera-space.smooth-track {
+            transition: transform 0.1s ease-out;
+        }
+
         #map-grid {
             background: white;
             border: 3px solid black;
@@ -162,7 +175,7 @@
             position: absolute;
             box-sizing: border-box;
             background-repeat: repeat !important;
-            background-size: 120px 120px !important; /* Increased texture mapping resolution scale */
+            background-size: 120px 120px !important;
         }
         .editor-obj.selected {
             outline: 2px dashed black;
@@ -235,8 +248,8 @@
         /* ENLARGED CHARACTER PNG MATRIX */
         #studio-character {
             position: absolute;
-            width: 60px; /* Expanded scaling aspect size width */
-            height: 60px; /* Expanded scaling aspect size height */
+            width: 60px;
+            height: 60px;
             background-image: url('Character.png');
             background-size: contain;
             background-repeat: no-repeat;
@@ -341,6 +354,7 @@
         </div>
 
         <div id="viewport-container">
+            <div id="playtest-fog"></div>
             <div id="camera-space">
                 <div id="map-grid">
                     <div id="studio-character" onclick="selectCharacterTarget(event)"></div>
@@ -418,9 +432,9 @@
         let isRotatingObj = false;
         let centerPointX = 0, centerPointY = 0, startAngle = 0, baseRotation = 0;
 
-        // Viewport Pan/Zoom States
+        // Viewport Pan/Zoom/Input Move States
         let camX = 50, camY = 50, currentZoomScale = 1.0;
-        let isSpacePanning = false;
+        let editorCamSpeed = 8;
 
         // Engine Loop Hooks
         let animationRuntimeLoop = null;
@@ -431,6 +445,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             setupViewportCameraControls();
+            setupGlobalInputHandlers();
         });
 
         function initializeStudioWorkspace() {
@@ -449,7 +464,16 @@
             
             if(animationRuntimeLoop) clearInterval(animationRuntimeLoop);
             animationRuntimeLoop = setInterval(() => {
-                if(isPlaytesting) return;
+                // Handle continuous panning when holding down arrow keys in edit mode
+                if(!isPlaytesting) {
+                    let camMoved = false;
+                    if (keyLayoutState['arrowup'])    { camY += editorCamSpeed; camMoved = true; }
+                    if (keyLayoutState['arrowdown'])  { camY -= editorCamSpeed; camMoved = true; }
+                    if (keyLayoutState['arrowleft'])  { camX += editorCamSpeed; camMoved = true; }
+                    if (keyLayoutState['arrowright']) { camX -= editorCamSpeed; camMoved = true; }
+                    if (camMoved) updateCameraTransformDOM();
+                }
+
                 sceneObjects.forEach(obj => {
                     if(obj.type === 'moving') {
                         advanceLinearNodeTrack(obj, 0.016);
@@ -459,42 +483,47 @@
             }, 16);
         }
 
+        function setupGlobalInputHandlers() {
+            window.addEventListener('keydown', (e) => {
+                let lowerKey = e.key.toLowerCase();
+                keyLayoutState[lowerKey] = true;
+                // Capture arrows to prevent natural page shifting while mapping
+                if(['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(lowerKey)) {
+                    e.preventDefault();
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                keyLayoutState[e.key.toLowerCase()] = false;
+            });
+        }
+
         function setupViewportCameraControls() {
             const view = document.getElementById('viewport-container');
-            
-            window.addEventListener('keydown', (e) => { if(e.code === 'Space') isSpacePanning = true; });
-            window.addEventListener('keyup', (e) => { if(e.code === 'Space') isSpacePanning = false; });
-
-            view.addEventListener('mousedown', (e) => {
-                if(!isSpacePanning && e.target === view) {
-                    clearSelectionStates();
-                    return;
-                }
-                if(!isSpacePanning) return;
-                
-                let startX = e.clientX - camX;
-                let startY = e.clientY - camY;
-                
-                function panMove(ev) {
-                    camX = ev.clientX - startX;
-                    camY = ev.clientY - startY;
-                    updateCameraTransformDOM();
-                }
-                function panEnd() {
-                    window.removeEventListener('mousemove', panMove);
-                    window.removeEventListener('mouseup', panEnd);
-                }
-                window.addEventListener('mousemove', panMove);
-                window.addEventListener('mouseup', panEnd);
-            });
 
             view.addEventListener('wheel', (e) => {
+                if (isPlaytesting) return; // Locks zoom wheel while playtesting
                 e.preventDefault();
                 let zoomFactor = 0.08;
                 if(e.deltaY < 0) currentZoomScale = Math.min(3.0, currentZoomScale + zoomFactor);
                 else currentZoomScale = Math.max(0.3, currentZoomScale - zoomFactor);
                 updateCameraTransformDOM();
             }, { passive: false });
+        }
+
+        // Centers the camera viewport frame directly onto the player matrix mid-axis
+        function updateCameraToPlayerFocus() {
+            const container = document.getElementById('viewport-container');
+            const viewW = container.clientWidth;
+            const viewH = container.clientHeight;
+            
+            // Forces tight zoom magnification during action testing
+            currentZoomScale = 1.3; 
+            
+            // Dynamic mid-point evaluation tracking offsets
+            camX = (viewW / 2) - ((playerCoords.x + 30) * currentZoomScale);
+            camY = (viewH / 2) - ((playerCoords.y + 30) * currentZoomScale);
+            
+            updateCameraTransformDOM();
         }
 
         function updateCameraTransformDOM() {
@@ -522,12 +551,13 @@
             if(primitiveType === 'circle') shapeGeometry = 'circle';
             if(primitiveType === 'triangle') shapeGeometry = 'triangle';
 
+            // Fixed coordinate spawn system to ignore camera transformations
             let newObj = {
                 id: "obj_" + objectIdCounter,
                 type: primitiveType,
                 shape: shapeGeometry,
-                left: Math.abs(camX) + 120,
-                top: Math.abs(camY) + 120,
+                left: 150,
+                top: 150,
                 width: 80,
                 height: 80,
                 rotation: 0,
@@ -535,8 +565,8 @@
                 color: '#cccccc',
                 collide: primitiveType !== 'kill' && primitiveType !== 'spawn',
                 speed: 4,
-                nodeA: { x: Math.abs(camX)+120, y: Math.abs(camY)+120 },
-                nodeB: { x: Math.abs(camX)+280, y: Math.abs(camY)+120 },
+                nodeA: { x: 150, y: 150 },
+                nodeB: { x: 300, y: 150 },
                 targetNode: 'B'
             };
 
@@ -550,7 +580,7 @@
             el.id = obj.id;
             el.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
-                if(isPlaytesting || isSpacePanning) return;
+                if(isPlaytesting) return;
                 selectObjectTarget(obj);
                 if(activeToolState === 'move') initiateTransformDrag(e, null);
             });
@@ -692,7 +722,7 @@
 
         function selectCharacterTarget(e) {
             e.stopPropagation();
-            if(isPlaytesting || isSpacePanning) return;
+            if(isPlaytesting) return;
             clearSelectionStates();
             
             isCharacterSelected = true;
@@ -881,42 +911,48 @@
 
                 clearSelectionStates();
                 isPlaytesting = true;
+                
+                // Active fog visual limiting and setup dynamic tracking configuration styles
+                document.getElementById('playtest-fog').style.display = "block";
+                document.getElementById('camera-space').classList.add('smooth-track');
+
                 document.getElementById('btn-playtest').textContent = "Stop Test";
                 document.getElementById('btn-playtest').style.borderColor = "red";
                 document.getElementById('btn-playtest').style.color = "red";
                 
-                // Spawn target math adjusted from center offsets of 20 to 30 to account for 60px frame scale tracking
                 spawnPointCoords.x = spawnObj.left + (spawnObj.width / 2) - 30;
                 spawnPointCoords.y = spawnObj.top + (spawnObj.height / 2) - 30;
                 
                 playerCoords.x = spawnPointCoords.x;
                 playerCoords.y = spawnPointCoords.y;
                 
-                window.addEventListener('keydown', registerKeys);
-                window.addEventListener('keyup', releaseKeys);
-                
+                // Instantly lock camera frames onto player target positions
+                updateCameraToPlayerFocus();
                 runPlaytestPhysicsLoop();
             } else {
                 isPlaytesting = false;
+                
+                // Remove playtest visuals and dynamic tracking tracks
+                document.getElementById('playtest-fog').style.display = "none";
+                document.getElementById('camera-space').classList.remove('smooth-track');
+
                 document.getElementById('btn-playtest').textContent = "Playtest Game";
                 document.getElementById('btn-playtest').style.borderColor = "green";
                 document.getElementById('btn-playtest').style.color = "green";
                 document.getElementById('death-screen').style.display = "none";
 
                 clearInterval(playtestPhysicsLoop);
-                window.removeEventListener('keydown', registerKeys);
-                window.removeEventListener('keyup', releaseKeys);
                 
                 playerCoords.x = spawnPointCoords.x;
                 playerCoords.y = spawnPointCoords.y;
                 document.getElementById('studio-character').style.left = playerCoords.x + "px";
                 document.getElementById('studio-character').style.top = playerCoords.y + "px";
-                keyLayoutState = {};
+                
+                // Return camera parameters safely to basic defaults
+                camX = 50; camY = 50; currentZoomScale = 1.0;
+                updateCameraTransformDOM();
             }
         }
-
-        function registerKeys(e) { keyLayoutState[e.key.toLowerCase()] = true; }
-        function releaseKeys(e) { keyLayoutState[e.key.toLowerCase()] = false; }
 
         function runPlaytestPhysicsLoop() {
             playtestPhysicsLoop = setInterval(() => {
@@ -924,6 +960,7 @@
                 let nextX = playerCoords.x;
                 let nextY = playerCoords.y;
 
+                // Support both standard WASD configurations or Arrow keys during testing loop
                 if(keyLayoutState['w'] || keyLayoutState['arrowup']) nextY -= speed;
                 if(keyLayoutState['s'] || keyLayoutState['arrowdown']) nextY += speed;
                 if(keyLayoutState['a'] || keyLayoutState['arrowleft']) nextX -= speed;
@@ -936,7 +973,6 @@
                         advanceLinearNodeTrack(obj, 0.016);
                         updateObjectElementPositionDOM(obj);
                         
-                        // Width/Height constraints tracking increased from 40 to 60
                         if(obj.collide && checkAABBCollision({x: playerCoords.x, y: playerCoords.y + 2, width: 60, height: 60}, obj)) {
                             nextX += (obj.left - oldL);
                             nextY += (obj.top - oldT);
@@ -963,6 +999,9 @@
                     char.style.left = playerCoords.x + "px";
                     char.style.top = playerCoords.y + "px";
                 }
+
+                // Smoothly slide the active camera view frame onto updated coordinates
+                updateCameraToPlayerFocus();
 
                 sceneObjects.forEach(obj => {
                     if(obj.type === 'kill' && checkAABBCollision({x: playerCoords.x, y: playerCoords.y, width: 60, height: 60}, obj)) {
