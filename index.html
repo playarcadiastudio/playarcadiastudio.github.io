@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcadia Studio Pro</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: white;
+            color: black;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #setup-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: white;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .setup-box {
+            border: 3px solid black;
+            padding: 30px;
+            width: 350px;
+            background: white;
+        }
+
+        /* TOP TOOLBAR WITH IMAGE BUTTONS */
+        #toolbar {
+            height: 65px;
+            border-bottom: 3px solid black;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            gap: 20px;
+            background: white;
+            z-index: 10;
+        }
+        .tool-btn-pkg {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 4px 8px;
+            border: 2px solid transparent;
+            background: none;
+        }
+        .tool-btn-pkg img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            margin-bottom: 2px;
+        }
+        .tool-btn-pkg span {
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .tool-btn-pkg.active {
+            border-color: black;
+            background: #f0f0f0;
+        }
+        .action-btn {
+            padding: 6px 12px;
+            border: 2px solid black;
+            background: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* MAIN WORKSPACE */
+        #workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 65px);
+        }
+
+        #left-panel {
+            width: 280px;
+            border-right: 3px solid black;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            z-index: 5;
+        }
+        .tab-headers {
+            display: flex;
+            border-bottom: 2px solid black;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .tab-btn.active {
+            background: black;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+            padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .asset-card {
+            border: 2px solid black;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            background: white;
+        }
+        .asset-card:hover {
+            background: #f0f0f0;
+        }
+
+        /* VIEWPORT WRAPPER (PAN & ZOOM CAPABLE) */
+        #viewport-container {
+            flex: 1;
+            background: #e0e0e0;
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+        }
+        #viewport-container:active {
+            cursor: grabbing;
+        }
+        #camera-space {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+        }
+        #map-grid {
+            background: white;
+            border: 3px solid black;
+            position: relative;
+        }
+        
+        /* SHAPES & MATERIAL CONFIGURATIONS */
+        .editor-obj {
+            position: absolute;
+            box-sizing: border-box;
+            background-repeat: repeat !important;
+            background-size: 40px 40px !important;
+        }
+        .editor-obj.selected {
+            outline: 2px dashed black;
+        }
+        
+        /* Primitive Shape Triggers */
+        .shape-cube { border: 2px solid black; }
+        .shape-circle { border: 2px solid black; border-radius: 50%; }
+        .shape-triangle {
+            border: none !important;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* Material Classes */
+        .mat-plastic { }
+        .mat-grass { background-image: url('grass.png'); }
+        .mat-brick { background-image: url('brick.png'); }
+        .mat-stone { background-image: url('stone.png'); }
+        .mat-wood { background-image: url('wood.png'); }
+        .mat-sand { background-image: url('sand.png'); }
+        .mat-metal { background-image: url('metal.png'); }
+
+        .obj-spawn { border: 2px dashed green; background: rgba(0,255,0,0.1); }
+        .obj-kill { border: 2px solid red; background: rgba(255,0,0,0.2); }
+
+        /* 4-SIDE SCALE EDGE HANDLES */
+        .scale-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border: 2px solid black;
+            z-index: 100;
+        }
+        .handle-t { top: -6px; left: calc(50% - 5px); cursor: ns-resize; }
+        .handle-b { bottom: -6px; left: calc(50% - 5px); cursor: ns-resize; }
+        .handle-l { left: -6px; top: calc(50% - 5px); cursor: ew-resize; }
+        .handle-r { right: -6px; top: calc(50% - 5px); cursor: ew-resize; }
+
+        /* DEDICATED VISUAL ROTATION HANDLE */
+        .rotate-handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: #ffff00;
+            border: 2px solid black;
+            border-radius: 50% !important;
+            top: -30px;
+            left: calc(50% - 7px);
+            cursor: grab;
+            z-index: 101;
+        }
+        .rotate-line {
+            position: absolute;
+            width: 2px;
+            height: 16px;
+            background: black;
+            top: -16px;
+            left: calc(50% - 1px);
+            z-index: 100;
+        }
+
+        .node-marker {
+            position: absolute;
+            width: 12px; height: 12px;
+            background: yellow; border: 2px solid black;
+            cursor: move; z-index: 110;
+        }
+
+        /* RENDER CHARACTER PNG VIA BACKDROP */
+        #studio-character {
+            position: absolute;
+            width: 40px; height: 40px;
+            background-image: url('character.png');
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            z-index: 90;
+        }
+
+        #right-panel {
+            width: 260px;
+            border-left: 3px solid black;
+            padding: 15px;
+            background: white;
+            overflow-y: auto;
+            z-index: 5;
+        }
+
+        input, select, textarea {
+            display: block;
+            width: 100%;
+            padding: 6px;
+            margin-bottom: 12px;
+            border: 2px solid black;
+            background: white;
+        }
+        label {
+            font-size: 11px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        #death-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,0,0,0.8);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup-overlay">
+        <div class="setup-box">
+            <h2>Arcadia Studio Pro</h2>
+            <br>
+            <label>Map Dimensions (Meters):</label>
+            <input type="number" id="map-size-input" value="40" min="10" max="200">
+            <button class="action-btn" onclick="initializeStudioWorkspace()" style="width:100%;">Create Environment</button>
+            <br><br><hr><br>
+            <label>Load from String:</label>
+            <input type="text" id="load-string-input" placeholder="Paste saved layout here">
+            <button class="action-btn" onclick="loadFromString()" style="width:100%;">Load Project</button>
+        </div>
+    </div>
+
+    <div id="toolbar">
+        <span style="font-weight: bold; border-right: 2px solid black; padding-right: 15px;">STUDIO</span>
+        
+        <button id="btn-tool-move" class="tool-btn-pkg active" onclick="setActiveTool('move')">
+            <img src="move.png" alt="Move">
+            <span>Move</span>
+        </button>
+        <button id="btn-tool-scale" class="tool-btn-pkg" onclick="setActiveTool('scale')">
+            <img src="scale.png" alt="Scale">
+            <span>Scale</span>
+        </button>
+        <button id="btn-tool-rotate" class="tool-btn-pkg" onclick="setActiveTool('rotate')">
+            <img src="rotate.png" alt="Rotate">
+            <span>Rotate</span>
+        </button>
+
+        <div style="flex:1;"></div>
+        <button id="btn-playtest" class="action-btn" style="color: green; border-color: green;" onclick="togglePlaytestMode()">Playtest Game</button>
+        <button class="action-btn" onclick="generateSaveString()">Save Game</button>
+    </div>
+
+    <div id="workspace">
+        <div id="left-panel">
+            <div class="tab-headers">
+                <button class="tab-btn active" onclick="switchTab('basic')">Geometry</button>
+                <button class="tab-btn" onclick="switchTab('scripted')">Logic</button>
+            </div>
+            
+            <div id="tab-basic" class="tab-content active">
+                <div class="asset-card" onclick="spawnMapElement('cube')">+ Spawn Cube</div>
+                <div class="asset-card" onclick="spawnMapElement('circle')">+ Spawn Circle</div>
+                <div class="asset-card" onclick="spawnMapElement('triangle')">+ Spawn Triangle</div>
+                <div class="asset-card" onclick="spawnMapElement('spawn')">+ Spawnpoint Pad</div>
+            </div>
+
+            <div id="tab-scripted" class="tab-content">
+                <div class="asset-card" onclick="spawnMapElement('kill')">+ Hazard Kill Brick</div>
+                <div class="asset-card" onclick="spawnMapElement('moving')">+ Moving Block</div>
+            </div>
+        </div>
+
+        <div id="viewport-container">
+            <div id="camera-space">
+                <div id="map-grid">
+                    <div id="studio-character" onclick="selectCharacterTarget(event)"></div>
+                    <div id="death-screen">
+                        <h1>Wasted</h1>
+                        <br>
+                        <button class="action-btn" onclick="respawnPlaytestCharacter()">Respawn</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="right-panel">
+            <h3>Properties</h3>
+            <br><hr><br>
+            <div id="properties-empty-notice" style="color: gray; font-style: italic;">Select an asset to view profiles.</div>
+            
+            <div id="properties-editor-form" style="display: none;">
+                <label>Object Reference ID:</label>
+                <input type="text" id="prop-id" readonly style="background: #eee;">
+
+                <div id="prop-field-material">
+                    <label>Material Texture Asset:</label>
+                    <select id="prop-material" onchange="updateSelectedObjectProperties()">
+                        <option value="plastic">Plastic (Plain Color)</option>
+                        <option value="grass">Grass</option>
+                        <option value="brick">Brick</option>
+                        <option value="stone">Stone</option>
+                        <option value="wood">Wood</option>
+                        <option value="sand">Sand</option>
+                        <option value="metal">Metal</option>
+                    </select>
+                </div>
+
+                <div id="prop-field-color">
+                    <label>Base Layer Solid Color:</label>
+                    <input type="color" id="prop-color" oninput="updateSelectedObjectProperties()">
+                </div>
+
+                <div id="prop-field-collision">
+                    <label>Collision State:</label>
+                    <select id="prop-collide" onchange="updateSelectedObjectProperties()">
+                        <option value="true">Solid Environment Wall</option>
+                        <option value="false">No Collision</option>
+                    </select>
+                </div>
+
+                <div id="prop-field-speed" style="display: none;">
+                    <label>Platform Speed (m/s):</label>
+                    <input type="number" id="prop-speed" min="1" max="25" step="1" oninput="updateSelectedObjectProperties()">
+                </div>
+
+                <button class="action-btn" style="border-color: red; color: red; width: 100%; margin-top: 15px;" onclick="deleteSelectedObject()">Delete Asset</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let meterScaleFactor = 20;
+        let totalMapMeters = 40;
+        let activeToolState = 'move';
+        let isPlaytesting = false;
+
+        let sceneObjects = [];
+        let objectIdCounter = 0;
+        let selectedObjectTarget = null;
+        let isCharacterSelected = false;
+
+        // Vector Transform Positioning Tracks
+        let isDraggingTransform = false;
+        let startMouseX = 0, startMouseY = 0;
+        let startObjLeft = 0, startObjTop = 0;
+        let startObjWidth = 0, startObjHeight = 0;
+        let currentActiveScaleHandle = null;
+        let isRotatingObj = false;
+        let centerPointX = 0, centerPointY = 0, startAngle = 0, baseRotation = 0;
+
+        // Viewport Pan/Zoom States
+        let camX = 50, camY = 50, currentZoomScale = 1.0;
+        let isSpacePanning = false;
+
+        // Engine Loop Hooks
+        let animationRuntimeLoop = null;
+        let playtestPhysicsLoop = null;
+        let keyLayoutState = {};
+        let spawnPointCoords = { x: 100, y: 100 };
+        let playerCoords = { x: 100, y: 100 };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setupViewportCameraControls();
+        });
+
+        function initializeStudioWorkspace() {
+            totalMapMeters = parseInt(document.getElementById('map-size-input').value) || 40;
+            const grid = document.getElementById('map-grid');
+            const pxSize = totalMapMeters * meterScaleFactor;
+            
+            grid.style.width = pxSize + "px";
+            grid.style.height = pxSize + "px";
+            
+            document.getElementById('studio-character').style.left = playerCoords.x + "px";
+            document.getElementById('studio-character').style.top = playerCoords.y + "px";
+            
+            document.getElementById('setup-overlay').style.display = "none";
+            updateCameraTransformDOM();
+            
+            if(animationRuntimeLoop) clearInterval(animationRuntimeLoop);
+            animationRuntimeLoop = setInterval(() => {
+                if(isPlaytesting) return;
+                sceneObjects.forEach(obj => {
+                    if(obj.type === 'moving') {
+                        advanceLinearNodeTrack(obj, 0.016);
+                        updateObjectElementPositionDOM(obj);
+                    }
+                });
+            }, 16);
+        }
+
+        function setupViewportCameraControls() {
+            const view = document.getElementById('viewport-container');
+            
+            window.addEventListener('keydown', (e) => { if(e.code === 'Space') isSpacePanning = true; });
+            window.addEventListener('keyup', (e) => { if(e.code === 'Space') isSpacePanning = false; });
+
+            view.addEventListener('mousedown', (e) => {
+                if(!isSpacePanning && e.target === view) {
+                    clearSelectionStates();
+                    return;
+                }
+                if(!isSpacePanning) return;
+                
+                let startX = e.clientX - camX;
+                let startY = e.clientY - camY;
+                
+                function panMove(ev) {
+                    camX = ev.clientX - startX;
+                    camY = ev.clientY - startY;
+                    updateCameraTransformDOM();
+                }
+                function panEnd() {
+                    window.removeEventListener('mousemove', panMove);
+                    window.removeEventListener('mouseup', panEnd);
+                }
+                window.addEventListener('mousemove', panMove);
+                window.addEventListener('mouseup', panEnd);
+            });
+
+            view.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                let zoomFactor = 0.08;
+                if(e.deltaY < 0) currentZoomScale = Math.min(3.0, currentZoomScale + zoomFactor);
+                else currentZoomScale = Math.max(0.3, currentZoomScale - zoomFactor);
+                updateCameraTransformDOM();
+            }, { passive: false });
+        }
+
+        function updateCameraTransformDOM() {
+            const cam = document.getElementById('camera-space');
+            if(cam) cam.style.transform = `translate(${camX}px, ${camY}px) scale(${currentZoomScale})`;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+
+        function setActiveTool(toolMode) {
+            activeToolState = toolMode;
+            document.querySelectorAll('.tool-btn-pkg').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-tool-' + toolMode).classList.add('active');
+            if(selectedObjectTarget) selectObjectTarget(selectedObjectTarget);
+        }
+
+        function spawnMapElement(primitiveType) {
+            objectIdCounter++;
+            let shapeGeometry = 'cube';
+            if(primitiveType === 'circle') shapeGeometry = 'circle';
+            if(primitiveType === 'triangle') shapeGeometry = 'triangle';
+
+            let newObj = {
+                id: "obj_" + objectIdCounter,
+                type: primitiveType,
+                shape: shapeGeometry,
+                left: Math.abs(camX) + 120,
+                top: Math.abs(camY) + 120,
+                width: 80,
+                height: 80,
+                rotation: 0,
+                material: 'plastic',
+                color: '#cccccc',
+                collide: primitiveType !== 'kill' && primitiveType !== 'spawn',
+                speed: 4,
+                nodeA: { x: Math.abs(camX)+120, y: Math.abs(camY)+120 },
+                nodeB: { x: Math.abs(camX)+280, y: Math.abs(camY)+120 },
+                targetNode: 'B'
+            };
+
+            sceneObjects.push(newObj);
+            renderObjectElementDOM(newObj);
+            selectObjectTarget(newObj);
+        }
+
+        function renderObjectElementDOM(obj) {
+            const el = document.createElement('div');
+            el.id = obj.id;
+            el.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                if(isPlaytesting || isSpacePanning) return;
+                selectObjectTarget(obj);
+                if(activeToolState === 'move') initiateTransformDrag(e, null);
+            });
+
+            document.getElementById('map-grid').appendChild(el);
+            updateObjectElementPositionDOM(obj);
+        }
+
+        function updateObjectElementPositionDOM(obj) {
+            const el = document.getElementById(obj.id);
+            if(!el) return;
+            
+            el.className = `editor-obj shape-${obj.shape} mat-${obj.material}`;
+            if(obj.type === 'kill') el.classList.add('obj-kill');
+            if(obj.type === 'spawn') el.classList.add('obj-spawn');
+            if(selectedObjectTarget && selectedObjectTarget.id === obj.id) el.classList.add('selected');
+
+            el.style.left = obj.left + "px";
+            el.style.top = obj.top + "px";
+            el.style.width = obj.width + "px";
+            el.style.height = obj.height + "px";
+            el.style.transform = `rotate(${obj.rotation}deg)`;
+
+            if(obj.material === 'plastic') {
+                el.style.backgroundColor = obj.color;
+            } else {
+                el.style.backgroundColor = "transparent";
+            }
+        }
+
+        function selectObjectTarget(obj) {
+            clearSelectionStates();
+            selectedObjectTarget = obj;
+            
+            const el = document.getElementById(obj.id);
+            if(el) el.classList.add('selected');
+
+            document.getElementById('properties-empty-notice').style.display = "none";
+            document.getElementById('properties-editor-form').style.display = "block";
+            
+            document.getElementById('prop-id').value = obj.id;
+            document.getElementById('prop-material').value = obj.material;
+            document.getElementById('prop-color').value = obj.color;
+            document.getElementById('prop-collide').value = obj.collide.toString();
+            document.getElementById('prop-speed').value = obj.speed;
+
+            const colorField = document.getElementById('prop-field-color');
+            if(obj.material === 'plastic') {
+                colorField.style.display = "block";
+                document.getElementById('prop-color').disabled = false;
+            } else {
+                colorField.style.display = "none";
+                document.getElementById('prop-color').disabled = true;
+            }
+
+            document.getElementById('prop-field-speed').style.display = (obj.type === 'moving') ? "block" : "none";
+            
+            if(obj.type === 'moving' && !isPlaytesting) {
+                renderNodeMarkersDOM(obj);
+            }
+
+            // APPEND SPECIALIZED CONTROLS DEPENDING ON ACTIVATED TOOL
+            if(!isPlaytesting) {
+                if(activeToolState === 'scale') {
+                    appendScaleHandlesDOM(el);
+                } else if(activeToolState === 'rotate') {
+                    appendRotateHandleDOM(el);
+                }
+            }
+        }
+
+        function appendScaleHandlesDOM(parentEl) {
+            const directions = ['t', 'b', 'l', 'r'];
+            directions.forEach(dir => {
+                const handle = document.createElement('div');
+                handle.className = `scale-handle handle-${dir}`;
+                handle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    initiateTransformDrag(e, dir);
+                });
+                parentEl.appendChild(handle);
+            });
+        }
+
+        // CREATES INTERACTIVE VIEWPORT ROTATION BUTTON CONTROL
+        function appendRotateHandleDOM(parentEl) {
+            const line = document.createElement('div');
+            line.className = 'rotate-line';
+            
+            const handle = document.createElement('div');
+            handle.className = 'rotate-handle';
+            
+            handle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                initiateMouseRotation(e);
+            });
+
+            parentEl.appendChild(line);
+            parentEl.appendChild(handle);
+        }
+
+        // INTERACTIVE MOUSE ANGLE CALCULATOR HOOK
+        function initiateMouseRotation(e) {
+            if(!selectedObjectTarget) return;
+            isRotatingObj = true;
+
+            const el = document.getElementById(selectedObjectTarget.id);
+            const rect = el.getBoundingClientRect();
+            
+            // Calculate screen center point of target block
+            centerPointX = rect.left + rect.width / 2;
+            centerPointY = rect.top + rect.height / 2;
+            
+            // Get initial cursor-to-center angle coordinates
+            let rad = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX);
+            startAngle = rad * (180 / Math.PI);
+            baseRotation = selectedObjectTarget.rotation;
+
+            document.addEventListener('mousemove', processMouseRotation);
+            document.addEventListener('mouseup', terminateMouseRotation);
+        }
+
+        function processMouseRotation(e) {
+            if(!isRotatingObj || !selectedObjectTarget) return;
+
+            let rad = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX);
+            let currentAngle = rad * (180 / Math.PI);
+            
+            let angleDiff = currentAngle - startAngle;
+            let finalRot = (baseRotation + angleDiff) % 360;
+            if(finalRot < 0) finalRot += 360;
+
+            selectedObjectTarget.rotation = Math.round(finalRot);
+            
+            const el = document.getElementById(selectedObjectTarget.id);
+            if(el) el.style.transform = `rotate(${selectedObjectTarget.rotation}deg)`;
+        }
+
+        function terminateMouseRotation() {
+            isRotatingObj = false;
+            document.removeEventListener('mousemove', processMouseRotation);
+            document.removeEventListener('mouseup', terminateMouseRotation);
+        }
+
+        function selectCharacterTarget(e) {
+            e.stopPropagation();
+            if(isPlaytesting || isSpacePanning) return;
+            clearSelectionStates();
+            
+            isCharacterSelected = true;
+            document.getElementById('studio-character').style.outline = "2px dashed black";
+            
+            document.getElementById('properties-empty-notice').style.display = "none";
+            document.getElementById('properties-editor-form').style.display = "block";
+            document.getElementById('prop-id').value = "Player_Character";
+            document.getElementById('prop-field-material').style.display = "none";
+            document.getElementById('prop-field-color').style.display = "none";
+            document.getElementById('prop-field-collision').style.display = "none";
+            document.getElementById('prop-field-speed').style.display = "none";
+
+            if(activeToolState === 'move') initiateTransformDrag(e, null);
+        }
+
+        function clearSelectionStates() {
+            selectedObjectTarget = null;
+            isCharacterSelected = false;
+            document.getElementById('studio-character').style.outline = "none";
+            document.querySelectorAll('.editor-obj').forEach(el => {
+                el.classList.remove('selected');
+                el.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
+            });
+            document.querySelectorAll('.node-marker').forEach(n => n.remove());
+            
+            document.getElementById('properties-editor-form').style.display = "none";
+            document.getElementById('properties-empty-notice').style.display = "block";
+            document.getElementById('prop-field-material').style.display = "block";
+            document.getElementById('prop-field-color').style.display = "block";
+            document.getElementById('prop-field-collision').style.display = "block";
+        }
+
+        function initiateTransformDrag(e, scaleDirection) {
+            isDraggingTransform = true;
+            currentActiveScaleHandle = scaleDirection;
+            startMouseX = e.clientX;
+            startMouseY = e.clientY;
+            
+            if(isCharacterSelected) {
+                startObjLeft = playerCoords.x;
+                startObjTop = playerCoords.y;
+            } else if(selectedObjectTarget) {
+                startObjLeft = selectedObjectTarget.left;
+                startObjTop = selectedObjectTarget.top;
+                startObjWidth = selectedObjectTarget.width;
+                startObjHeight = selectedObjectTarget.height;
+            }
+            
+            document.addEventListener('mousemove', processTransformDrag);
+            document.addEventListener('mouseup', terminateTransformDrag);
+        }
+
+        function processTransformDrag(e) {
+            if(!isDraggingTransform) return;
+            
+            let deltaX = (e.clientX - startMouseX) / currentZoomScale;
+            let deltaY = (e.clientY - startMouseY) / currentZoomScale;
+            
+            if(isCharacterSelected) {
+                playerCoords.x = startObjLeft + deltaX;
+                playerCoords.y = startObjTop + deltaY;
+                document.getElementById('studio-character').style.left = playerCoords.x + "px";
+                document.getElementById('studio-character').style.top = playerCoords.y + "px";
+            } else if(selectedObjectTarget) {
+                if(activeToolState === 'move') {
+                    selectedObjectTarget.left = startObjLeft + deltaX;
+                    selectedObjectTarget.top = startObjTop + deltaY;
+                    
+                    if(selectedObjectTarget.type === 'moving') {
+                        let dx = selectedObjectTarget.left - startObjLeft;
+                        let dy = selectedObjectTarget.top - startObjTop;
+                        selectedObjectTarget.nodeA.x += dx; selectedObjectTarget.nodeA.y += dy;
+                        selectedObjectTarget.nodeB.x += dx; selectedObjectTarget.nodeB.y += dy;
+                        startObjLeft = selectedObjectTarget.left;
+                        startObjTop = selectedObjectTarget.top;
+                        renderNodeMarkersDOM(selectedObjectTarget);
+                    }
+                } else if(activeToolState === 'scale' && currentActiveScaleHandle) {
+                    if(currentActiveScaleHandle === 't') {
+                        selectedObjectTarget.top = startObjTop + deltaY;
+                        selectedObjectTarget.height = Math.max(15, startObjHeight - deltaY);
+                    }
+                    if(currentActiveScaleHandle === 'b') {
+                        selectedObjectTarget.height = Math.max(15, startObjHeight + deltaY);
+                    }
+                    if(currentActiveScaleHandle === 'l') {
+                        selectedObjectTarget.left = startObjLeft + deltaX;
+                        selectedObjectTarget.width = Math.max(15, startObjWidth - deltaX);
+                    }
+                    if(currentActiveScaleHandle === 'r') {
+                        selectedObjectTarget.width = Math.max(15, startObjWidth + deltaX);
+                    }
+                }
+                updateObjectElementPositionDOM(selectedObjectTarget);
+            }
+        }
+
+        function terminateTransformDrag() {
+            isDraggingTransform = false;
+            document.removeEventListener('mousemove', processTransformDrag);
+            document.removeEventListener('mouseup', terminateTransformDrag);
+        }
+
+        function updateSelectedObjectProperties() {
+            if(!selectedObjectTarget) return;
+            
+            selectedObjectTarget.material = document.getElementById('prop-material').value;
+            selectedObjectTarget.color = document.getElementById('prop-color').value;
+            selectedObjectTarget.collide = (document.getElementById('prop-collide').value === "true");
+            selectedObjectTarget.speed = parseFloat(document.getElementById('prop-speed').value) || 4;
+
+            const colorField = document.getElementById('prop-field-color');
+            if(selectedObjectTarget.material === 'plastic') {
+                colorField.style.display = "block";
+                document.getElementById('prop-color').disabled = false;
+            } else {
+                colorField.style.display = "none";
+                document.getElementById('prop-color').disabled = true;
+            }
+            
+            updateObjectElementPositionDOM(selectedObjectTarget);
+        }
+
+        function renderNodeMarkersDOM(obj) {
+            document.querySelectorAll('.node-marker').forEach(n => n.remove());
+            createMarkerNodeElement(obj, 'A');
+            createMarkerNodeElement(obj, 'B');
+        }
+
+        function createMarkerNodeElement(obj, label) {
+            const marker = document.createElement('div');
+            marker.className = "node-marker";
+            let targetCoords = (label === 'A') ? obj.nodeA : obj.nodeB;
+            marker.style.left = (targetCoords.x - 6) + "px";
+            marker.style.top = (targetCoords.y - 6) + "px";
+            
+            marker.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                let mX = e.clientX, mY = e.clientY;
+                let initX = targetCoords.x, initY = targetCoords.y;
+                
+                function drag(ev) {
+                    targetCoords.x = initX + (ev.clientX - mX) / currentZoomScale;
+                    targetCoords.y = initY + (ev.clientY - mY) / currentZoomScale;
+                    marker.style.left = (targetCoords.x - 6) + "px";
+                    marker.style.top = (targetCoords.y - 6) + "px";
+                }
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', () => document.removeEventListener('mousemove', drag));
+            });
+            document.getElementById('map-grid').appendChild(marker);
+        }
+
+        function deleteSelectedObject() {
+            if(!selectedObjectTarget) return;
+            document.getElementById(selectedObjectTarget.id)?.remove();
+            sceneObjects = sceneObjects.filter(o => o.id !== selectedObjectTarget.id);
+            clearSelectionStates();
+        }
+
+        function advanceLinearNodeTrack(obj, stepSeconds) {
+            let target = (obj.targetNode === 'A') ? obj.nodeA : obj.nodeB;
+            let dx = target.x - obj.left;
+            let dy = target.y - obj.top;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let frameAmt = obj.speed * meterScaleFactor * stepSeconds;
+
+            if(dist <= frameAmt) {
+                obj.left = target.x;
+                obj.top = target.y;
+                obj.targetNode = (obj.targetNode === 'B') ? 'A' : 'B';
+            } else {
+                obj.left += (dx / dist) * frameAmt;
+                obj.top += (dy / dist) * frameAmt;
+            }
+        }
+
+        function togglePlaytestMode() {
+            if(!isPlaytesting) {
+                clearSelectionStates();
+                isPlaytesting = true;
+                document.getElementById('btn-playtest').textContent = "Stop Test";
+                document.getElementById('btn-playtest').style.borderColor = "red";
+                document.getElementById('btn-playtest').style.color = "red";
+                
+                let spawnObj = sceneObjects.find(o => o.type === 'spawn');
+                if(spawnObj) {
+                    spawnPointCoords.x = spawnObj.left + (spawnObj.width / 2) - 20;
+                    spawnPointCoords.y = spawnObj.top + (spawnObj.height / 2) - 20;
+                }
+                
+                playerCoords.x = spawnPointCoords.x;
+                playerCoords.y = spawnPointCoords.y;
+                
+                window.addEventListener('keydown', registerKeys);
+                window.addEventListener('keyup', releaseKeys);
+                
+                runPlaytestPhysicsLoop();
+            } else {
+                isPlaytesting = false;
+                document.getElementById('btn-playtest').textContent = "Playtest Game";
+                document.getElementById('btn-playtest').style.borderColor = "green";
+                document.getElementById('btn-playtest').style.color = "green";
+                document.getElementById('death-screen').style.display = "none";
+
+                clearInterval(playtestPhysicsLoop);
+                window.removeEventListener('keydown', registerKeys);
+                window.removeEventListener('keyup', releaseKeys);
+                
+                playerCoords.x = spawnPointCoords.x;
+                playerCoords.y = spawnPointCoords.y;
+                document.getElementById('studio-character').style.left = playerCoords.x + "px";
+                document.getElementById('studio-character').style.top = playerCoords.y + "px";
+                keyLayoutState = {};
+            }
+        }
+
+        function registerKeys(e) { keyLayoutState[e.key.toLowerCase()] = true; }
+        function releaseKeys(e) { keyLayoutState[e.key.toLowerCase()] = false; }
+
+        function runPlaytestPhysicsLoop() {
+            playtestPhysicsLoop = setInterval(() => {
+                let speed = 5 * meterScaleFactor * 0.016; 
+                let nextX = playerCoords.x;
+                let nextY = playerCoords.y;
+
+                if(keyLayoutState['w'] || keyLayoutState['arrowup']) nextY -= speed;
+                if(keyLayoutState['s'] || keyLayoutState['arrowdown']) nextY += speed;
+                if(keyLayoutState['a'] || keyLayoutState['arrowleft']) nextX -= speed;
+                if(keyLayoutState['d'] || keyLayoutState['arrowright']) nextX += speed;
+
+                sceneObjects.forEach(obj => {
+                    if(obj.type === 'moving') {
+                        let oldL = obj.left;
+                        let oldT = obj.top;
+                        advanceLinearNodeTrack(obj, 0.016);
+                        updateObjectElementPositionDOM(obj);
+                        
+                        if(obj.collide && checkAABBCollision({x: playerCoords.x, y: playerCoords.y + 2, width: 40, height: 40}, obj)) {
+                            nextX += (obj.left - oldL);
+                            nextY += (obj.top - oldT);
+                        }
+                    }
+                });
+
+                let limit = totalMapMeters * meterScaleFactor;
+                if(nextX < 0) nextX = 0; if(nextY < 0) nextY = 0;
+                if(nextX > limit - 40) nextX = limit - 40; if(nextY > limit - 40) nextY = limit - 40;
+
+                let hitH = false, hitV = false;
+                sceneObjects.forEach(obj => {
+                    if(!obj.collide) return;
+                    if(checkAABBCollision({x: nextX, y: playerCoords.y, width: 40, height: 40}, obj)) hitH = true;
+                    if(checkAABBCollision({x: playerCoords.x, y: nextY, width: 40, height: 40}, obj)) hitV = true;
+                });
+
+                if(!hitH) playerCoords.x = nextX;
+                if(!hitV) playerCoords.y = nextY;
+
+                const char = document.getElementById('studio-character');
+                char.style.left = playerCoords.x + "px";
+                char.style.top = playerCoords.y + "px";
+
+                sceneObjects.forEach(obj => {
+                    if(obj.type === 'kill' && checkAABBCollision({x: playerCoords.x, y: playerCoords.y, width: 40, height: 40}, obj)) {
+                        clearInterval(playtestPhysicsLoop);
+                        document.getElementById('death-screen').style.display = "flex";
+                    }
+                });
+            }, 16);
+        }
+
+        function checkAABBCollision(r1, r2) {
+            return (r1.x < r2.left + r2.width && r1.x + r1.width > r2.left &&
+                    r1.y < r2.top + r2.height && r1.y + r1.height > r2.top);
+        }
+
+        function respawnPlaytestCharacter() {
+            document.getElementById('death-screen').style.display = "none";
+            playerCoords.x = spawnPointCoords.x;
+            playerCoords.y = spawnPointCoords.y;
+            runPlaytestPhysicsLoop();
+        }
+
+        function generateSaveString() {
+            let pkg = { mapSize: totalMapMeters, counter: objectIdCounter, objects: sceneObjects, player: playerCoords };
+            prompt("Copy save code layout project configuration string:", JSON.stringify(pkg));
+        }
+
+        function loadFromString() {
+            let str = document.getElementById('load-string-input').value.trim();
+            if(!str) return alert("Empty input data profile!");
+            try {
+                let parsed = JSON.parse(str);
+                sceneObjects.forEach(o => document.getElementById(o.id)?.remove());
+                totalMapMeters = parsed.mapSize || 40;
+                document.getElementById('map-size-input').value = totalMapMeters;
+                objectIdCounter = parsed.counter || 0;
+                sceneObjects = parsed.objects || [];
+                playerCoords = parsed.player || {x:100,y:100};
+                initializeStudioWorkspace();
+                sceneObjects.forEach(o => renderObjectElementDOM(o));
+                clearSelectionStates();
+            } catch(e) { alert("Invalid layout code signature."); }
+        }
+    </script>
+</body>
+</html>
