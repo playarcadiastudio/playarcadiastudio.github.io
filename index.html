@@ -184,22 +184,44 @@
         .node-dot-a { background: #00ff55; }
         .node-dot-b { background: #ff0055; }
 
-        /* CHARACTERS & WIELDABLES */
+        /* CHARACTERS & WIELDABLES (Sized up to 75px, hand positioning adjusted downwards) */
         .player-character {
-            position: absolute; width: 50px; height: 50px;
+            position: absolute; width: 75px; height: 75px;
             background-image: url('Character.png'); background-size: contain;
             background-repeat: no-repeat; background-position: center; z-index: 95;
         }
         .tool-overlay-node {
-            position: absolute; width: 32px; height: 32px;
+            position: absolute; width: 42px; height: 42px;
             background-size: contain; background-repeat: no-repeat;
-            bottom: 22px; right: 18px; transform-origin: bottom center; 
+            bottom: 12px; right: 8px; transform-origin: bottom center; 
             transform: rotate(45deg); display: none; z-index: 96;
-            transition: transform 0.05s ease-out;
+            transition: transform 0.05s ease-out, left 0.1s ease-out, right 0.1s ease-out;
         }
-        .health-bar-container { position: absolute; top: -15px; left: -5px; width: 60px; height: 6px; border: 1px solid black; background: red; }
+        /* Style variation for when walking left */
+        .tool-overlay-node.facing-left {
+            right: auto;
+            left: 8px;
+            transform: rotate(-45deg);
+            transform-origin: bottom center;
+        }
+        .health-bar-container { position: absolute; top: -15px; left: 7px; width: 60px; height: 6px; border: 1px solid black; background: red; }
         .health-bar-fill { width: 100%; height: 100%; background: #00ff00; }
-        .player-label { position: absolute; top: -32px; left: -5px; width: 60px; text-align: center; font-size: 10px; font-weight: bold; background: rgba(255,255,255,0.7); }
+        .player-label { position: absolute; top: -32px; left: 7px; width: 60px; text-align: center; font-size: 10px; font-weight: bold; background: rgba(255,255,255,0.7); }
+
+        /* FLOATING COOLDOWN TEXT STYLE */
+        #hammer-cooldown-indicator {
+            position: fixed;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.85);
+            color: #ffff00;
+            padding: 4px 8px;
+            border: 2px solid black;
+            font-weight: bold;
+            font-size: 13px;
+            z-index: 5000;
+            display: none;
+            transform: translate(15px, 15px);
+        }
 
         /* HOTBAR */
         #hud-hotbar {
@@ -227,6 +249,8 @@
     </style>
 </head>
 <body>
+
+    <div id="hammer-cooldown-indicator">Cooldown: 3</div>
 
     <div id="setup-overlay">
         <div class="setup-box">
@@ -439,6 +463,10 @@
         let playersData = {};
         let activeControlledPlayerId = null;
 
+        // Hammer Cooldown Tracker Configuration
+        let hammerCooldownTimer = 0;
+        let hammerCooldownInterval = null;
+
         let camX = 50, camY = 50, currentZoomScale = 1.0;
         let editorCamSpeed = 8;
 
@@ -456,12 +484,12 @@
             setupViewportCameraControls();
             setupGlobalInputHandlers();
             setupMapClicksForTools();
+            setupCooldownHUDTracking();
         });
 
         function setupViewportCameraControls() {
             const container = document.getElementById('viewport-container');
             
-            // FULL FIX: Zoom processing engine hooked directly onto container
             container.addEventListener('wheel', (e) => {
                 e.preventDefault();
                 let zoomFactor = 0.08;
@@ -472,6 +500,17 @@
                 }
                 updateCameraTransformDOM();
             }, { passive: false });
+        }
+
+        function setupCooldownHUDTracking() {
+            // Locks the floating element to the current mouse cursor coordinates
+            window.addEventListener('mousemove', (e) => {
+                let indicator = document.getElementById('hammer-cooldown-indicator');
+                if (hammerCooldownTimer > 0 && isPlaytesting) {
+                    indicator.style.left = e.clientX + "px";
+                    indicator.style.top = e.clientY + "px";
+                }
+            });
         }
 
         function initializeStudioWorkspace() {
@@ -537,6 +576,17 @@
 
                 if(isPlaytesting && activeControlledPlayerId) {
                     let activePlayer = playersData[activeControlledPlayerId];
+                    
+                    // Track structural orientation changes based on directional inputs
+                    if(lowerKey === 'a' || lowerKey === 'arrowleft') {
+                        activePlayer.facingDirection = 'left';
+                        syncHeldToolVisualsDOM();
+                    }
+                    if(lowerKey === 'd' || lowerKey === 'arrowright') {
+                        activePlayer.facingDirection = 'right';
+                        syncHeldToolVisualsDOM();
+                    }
+
                     if(lowerKey === '1' && activePlayer.inventory[0]) {
                         activePlayer.selectedTool = activePlayer.inventory[0];
                         renderInventoryHotbarHUD();
@@ -557,7 +607,6 @@
                 keyLayoutState[e.key.toLowerCase()] = false; 
             });
 
-            // Safeguard against stuck modifier keys if screen window gets defocused
             window.addEventListener('blur', () => {
                 keyLayoutState = {};
             });
@@ -575,13 +624,34 @@
 
                 if(activePlayer.selectedTool === 'hammer') {
                     e.stopPropagation();
+                    if (hammerCooldownTimer > 0) return; // Prevent action if layout is resting
+                    
                     buildHammerBlockAtClickLocation(clickX, clickY);
                     triggerHeldToolSlashEffect();
+                    startHammerCooldownSequence();
                 } else if(activePlayer.selectedTool === 'sword') {
                     e.stopPropagation();
                     triggerActivePlayerAttack();
                 }
             });
+        }
+
+        function startHammerCooldownSequence() {
+            hammerCooldownTimer = 3;
+            let indicator = document.getElementById('hammer-cooldown-indicator');
+            indicator.textContent = "Cooldown: " + hammerCooldownTimer;
+            indicator.style.display = "block";
+
+            if (hammerCooldownInterval) clearInterval(hammerCooldownInterval);
+            hammerCooldownInterval = setInterval(() => {
+                hammerCooldownTimer--;
+                if (hammerCooldownTimer <= 0) {
+                    clearInterval(hammerCooldownInterval);
+                    indicator.style.display = "none";
+                } else {
+                    indicator.textContent = "Cooldown: " + hammerCooldownTimer;
+                }
+            }, 1000);
         }
 
         function updateCameraToActivePlayerFocus() {
@@ -591,8 +661,8 @@
             if(!target) return;
 
             currentZoomScale = 2.2; 
-            camX = (container.clientWidth / 2) - ((target.x + 25) * currentZoomScale);
-            camY = (container.clientHeight / 2) - ((target.y + 25) * currentZoomScale);
+            camX = (container.clientWidth / 2) - ((target.x + 37.5) * currentZoomScale);
+            camY = (container.clientHeight / 2) - ((target.y + 37.5) * currentZoomScale);
             updateCameraTransformDOM();
         }
 
@@ -694,8 +764,8 @@
                 document.getElementById('players-layer').innerHTML = "";
                 playersData = {};
 
-                let sx = spawnObj.left + (spawnObj.width / 2) - 25;
-                let sy = spawnObj.top + (spawnObj.height / 2) - 25;
+                let sx = spawnObj.left + (spawnObj.width / 2) - 37.5;
+                let sy = spawnObj.top + (spawnObj.height / 2) - 37.5;
 
                 for(let i = 1; i <= simulatePlayerCount; i++) {
                     let pId = "player_" + i;
@@ -705,7 +775,8 @@
                         x: sx + (i * 12), y: sy,
                         health: 100,
                         inventory: [...defaultStarterPack],
-                        selectedTool: defaultStarterPack[0] || null
+                        selectedTool: defaultStarterPack[0] || null,
+                        facingDirection: 'right' // Default layout anchor
                     };
 
                     let tab = document.createElement('button');
@@ -735,6 +806,10 @@
                 runPlaytestPhysicsLoop();
             } else {
                 isPlaytesting = false;
+                hammerCooldownTimer = 0;
+                if(hammerCooldownInterval) clearInterval(hammerCooldownInterval);
+                document.getElementById('hammer-cooldown-indicator').style.display = "none";
+
                 document.getElementById('camera-space').classList.remove('smooth-track');
                 document.getElementById('mp-switcher-bar').style.display = "none";
                 document.getElementById('hud-hotbar').innerHTML = "";
@@ -797,7 +872,14 @@
                 if(pData.health > 0 && pData.selectedTool) {
                     node.style.display = "block";
                     node.style.backgroundImage = `url('${pData.selectedTool}.png')`;
-                    node.style.transform = "rotate(45deg)"; 
+                    
+                    if(pData.facingDirection === 'left') {
+                        node.classList.add('facing-left');
+                        node.style.transform = "rotate(-45deg)";
+                    } else {
+                        node.classList.remove('facing-left');
+                        node.style.transform = "rotate(45deg)";
+                    }
                 } else {
                     node.style.display = "none";
                 }
@@ -810,10 +892,12 @@
 
             let node = document.getElementById(`wield_node_${attacker.id}`);
             if(node) {
-                // Rotates downward into a -90deg clean dynamic strike sequence 
-                node.style.transform = "rotate(-90deg)";
+                let targetAngle = (attacker.facingDirection === 'left') ? "rotate(90deg)" : "rotate(-90deg)";
+                let baseAngle = (attacker.facingDirection === 'left') ? "rotate(-45deg)" : "rotate(45deg)";
+                
+                node.style.transform = targetAngle;
                 setTimeout(() => { 
-                    if(attacker.selectedTool) node.style.transform = "rotate(45deg)"; 
+                    if(attacker.selectedTool) node.style.transform = baseAngle; 
                 }, 150);
             }
         }
@@ -885,13 +969,28 @@
                     let nextX = activeUser.x;
                     let nextY = activeUser.y;
 
+                    let horizontalInput = false;
+
                     if(keyLayoutState['w'] || keyLayoutState['arrowup']) nextY -= speed;
                     if(keyLayoutState['s'] || keyLayoutState['arrowdown']) nextY += speed;
-                    if(keyLayoutState['a'] || keyLayoutState['arrowleft']) nextX -= speed;
-                    if(keyLayoutState['d'] || keyLayoutState['arrowright']) nextX += speed;
+                    
+                    if(keyLayoutState['a'] || keyLayoutState['arrowleft']) { 
+                        nextX -= speed; 
+                        activeUser.facingDirection = 'left';
+                        horizontalInput = true;
+                    }
+                    if(keyLayoutState['d'] || keyLayoutState['arrowright']) { 
+                        nextX += speed; 
+                        activeUser.facingDirection = 'right';
+                        horizontalInput = true;
+                    }
+
+                    if (horizontalInput) {
+                        syncHeldToolVisualsDOM();
+                    }
 
                     sceneObjects.forEach(obj => {
-                        let currentBox = { x: activeUser.x, y: activeUser.y, width: 50, height: 50 };
+                        let currentBox = { x: activeUser.x, y: activeUser.y, width: 75, height: 75 };
                         
                         if(checkShapeSpecificCollision(currentBox, obj.shape, obj)) {
                             if (obj.dragOn) {
@@ -904,8 +1003,8 @@
                                     let rad = obj.angularVelocity * Math.PI / 180;
                                     let cx = obj.left + obj.width/2;
                                     let cy = obj.top + obj.height/2;
-                                    let rx = (activeUser.x + 25) - cx;
-                                    let ry = (activeUser.y + 25) - cy;
+                                    let rx = (activeUser.x + 37.5) - cx;
+                                    let ry = (activeUser.y + 37.5) - cy;
                                     let rotX = (rx * Math.cos(rad) - ry * Math.sin(rad)) - rx;
                                     let rotY = (rx * Math.sin(rad) + ry * Math.cos(rad)) - ry;
                                     nextX += rotX;
@@ -926,24 +1025,24 @@
 
                     let limit = totalMapMeters * meterScaleFactor;
                     if(nextX < 0) nextX = 0; if(nextY < 0) nextY = 0;
-                    if(nextX > limit - 50) nextX = limit - 50; if(nextY > limit - 50) nextY = limit - 50;
+                    if(nextX > limit - 75) nextX = limit - 75; if(nextY > limit - 75) nextY = limit - 75;
 
                     let hitH = false, hitV = false;
                     let obstacles = [...sceneObjects, ...hammerBlocks];
                     
                     obstacles.forEach(obj => {
                         if(!obj.collide || obj.type === 'spawn') return;
-                        if(obj.dragOn && checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 50, height: 50}, obj.shape || 'cube', obj)) {
+                        if(obj.dragOn && checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 75, height: 75}, obj.shape || 'cube', obj)) {
                             return;
                         }
 
                         let shapeType = obj.shape || 'cube';
-                        let currentlyInside = checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 50, height: 50}, shapeType, obj);
+                        let currentlyInside = checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 75, height: 75}, shapeType, obj);
                         
-                        if(checkShapeSpecificCollision({x: nextX, y: activeUser.y, width: 50, height: 50}, shapeType, obj)) {
+                        if(checkShapeSpecificCollision({x: nextX, y: activeUser.y, width: 75, height: 75}, shapeType, obj)) {
                             if(!currentlyInside) hitH = true; 
                         }
-                        if(checkShapeSpecificCollision({x: activeUser.x, y: nextY, width: 50, height: 50}, shapeType, obj)) {
+                        if(checkShapeSpecificCollision({x: activeUser.x, y: nextY, width: 75, height: 75}, shapeType, obj)) {
                             if(!currentlyInside) hitV = true; 
                         }
                     });
@@ -956,7 +1055,7 @@
 
                     sceneObjects.forEach(obj => {
                         if(obj.type === 'kill') {
-                            let updatedBox = { x: activeUser.x, y: activeUser.y, width: 50, height: 50 };
+                            let updatedBox = { x: activeUser.x, y: activeUser.y, width: 75, height: 75 };
                             if(checkShapeSpecificCollision(updatedBox, obj.shape, obj)) {
                                 damagePlayerTarget(activeUser, 100);
                             }
@@ -965,7 +1064,7 @@
 
                     if (activeUser.health > 0) {
                         droppedTools.forEach((tool, index) => {
-                            if(checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 50, height: 50}, 'cube', {left: tool.left, top: tool.top, width: 35, height: 35})) {
+                            if(checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 75, height: 75}, 'cube', {left: tool.left, top: tool.top, width: 35, height: 35})) {
                                 if(!activeUser.inventory.includes(tool.type)) {
                                     activeUser.inventory.push(tool.type);
                                     if(!activeUser.selectedTool) activeUser.selectedTool = tool.type;
@@ -1003,11 +1102,11 @@
                 if(pId === attacker.id) continue;
                 let target = playersData[pId];
                 if(target.health <= 0) continue;
-                if(Math.sqrt((attacker.x - target.x)**2 + (attacker.y - target.y)**2) <= 90) damagePlayerTarget(target, 25);
+                if(Math.sqrt((attacker.x - target.x)**2 + (attacker.y - target.y)**2) <= 110) damagePlayerTarget(target, 25);
             }
 
             hammerBlocks.forEach((block, index) => {
-                if(Math.sqrt((attacker.x - block.left)**2 + (attacker.y - block.top)**2) <= 100) {
+                if(Math.sqrt((attacker.x - block.left)**2 + (attacker.y - block.top)**2) <= 120) {
                     document.getElementById(block.id)?.remove();
                     hammerBlocks.splice(index, 1);
                 }
@@ -1044,8 +1143,9 @@
 
             document.getElementById('death-screen').style.display = "none";
             target.health = 100;
-            target.x = spawnObj.left + (spawnObj.width / 2) - 25;
-            target.y = spawnObj.top + (spawnObj.height / 2) - 25;
+            target.x = spawnObj.left + (spawnObj.width / 2) - 37.5;
+            target.y = spawnObj.top + (spawnObj.height / 2) - 37.5;
+            target.facingDirection = 'right';
 
             let fill = document.getElementById(`hp_fill_${target.id}`);
             if(fill) fill.style.width = "100%";
