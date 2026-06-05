@@ -184,7 +184,7 @@
         .node-dot-a { background: #00ff55; }
         .node-dot-b { background: #ff0055; }
 
-        /* CHARACTERS & WIELDABLES (Sized up to 75px, hand positioning adjusted downwards) */
+        /* CHARACTERS & WIELDABLES (Character is 75px, hand layer offsets calibrated uniformly) */
         .player-character {
             position: absolute; width: 75px; height: 75px;
             background-image: url('Character.png'); background-size: contain;
@@ -193,17 +193,20 @@
         .tool-overlay-node {
             position: absolute; width: 42px; height: 42px;
             background-size: contain; background-repeat: no-repeat;
-            bottom: 12px; right: 8px; transform-origin: bottom center; 
-            transform: rotate(45deg); display: none; z-index: 96;
-            transition: transform 0.05s ease-out, left 0.1s ease-out, right 0.1s ease-out;
+            bottom: 4px; display: none; z-index: 96;
+            transition: transform 0.05s ease-out;
         }
-        /* Style variation for when walking left */
-        .tool-overlay-node.facing-left {
-            right: auto;
-            left: 8px;
-            transform: rotate(-45deg);
+        
+        /* Specific directional layout classes using absolute left positions to keep offsets mirror-accurate */
+        .tool-overlay-node.pos-right {
+            left: 42px;
             transform-origin: bottom center;
         }
+        .tool-overlay-node.pos-left {
+            left: -9px;
+            transform-origin: bottom center;
+        }
+
         .health-bar-container { position: absolute; top: -15px; left: 7px; width: 60px; height: 6px; border: 1px solid black; background: red; }
         .health-bar-fill { width: 100%; height: 100%; background: #00ff00; }
         .player-label { position: absolute; top: -32px; left: 7px; width: 60px; text-align: center; font-size: 10px; font-weight: bold; background: rgba(255,255,255,0.7); }
@@ -503,7 +506,6 @@
         }
 
         function setupCooldownHUDTracking() {
-            // Locks the floating element to the current mouse cursor coordinates
             window.addEventListener('mousemove', (e) => {
                 let indicator = document.getElementById('hammer-cooldown-indicator');
                 if (hammerCooldownTimer > 0 && isPlaytesting) {
@@ -577,7 +579,6 @@
                 if(isPlaytesting && activeControlledPlayerId) {
                     let activePlayer = playersData[activeControlledPlayerId];
                     
-                    // Track structural orientation changes based on directional inputs
                     if(lowerKey === 'a' || lowerKey === 'arrowleft') {
                         activePlayer.facingDirection = 'left';
                         syncHeldToolVisualsDOM();
@@ -624,7 +625,7 @@
 
                 if(activePlayer.selectedTool === 'hammer') {
                     e.stopPropagation();
-                    if (hammerCooldownTimer > 0) return; // Prevent action if layout is resting
+                    if (hammerCooldownTimer > 0) return; 
                     
                     buildHammerBlockAtClickLocation(clickX, clickY);
                     triggerHeldToolSlashEffect();
@@ -736,7 +737,7 @@
             let type = selectedToolNodeTarget.obj.type;
             if(!defaultStarterPack.includes(type)) {
                 defaultStarterPack.push(type);
-                alert(`Added ${type} to starter layout.`);
+                alert(`Added ${type} to starter pack.`);
             }
             document.getElementById(selectedToolNodeTarget.obj.id)?.remove();
             droppedTools = droppedTools.filter(t => t.id !== selectedToolNodeTarget.obj.id);
@@ -776,7 +777,7 @@
                         health: 100,
                         inventory: [...defaultStarterPack],
                         selectedTool: defaultStarterPack[0] || null,
-                        facingDirection: 'right' // Default layout anchor
+                        facingDirection: 'right'
                     };
 
                     let tab = document.createElement('button');
@@ -873,11 +874,12 @@
                     node.style.display = "block";
                     node.style.backgroundImage = `url('${pData.selectedTool}.png')`;
                     
+                    // Fixed position anchors and matching rotations to eliminate visual clipping/dislocations
                     if(pData.facingDirection === 'left') {
-                        node.classList.add('facing-left');
+                        node.className = "tool-overlay-node pos-left";
                         node.style.transform = "rotate(-45deg)";
                     } else {
-                        node.classList.remove('facing-left');
+                        node.className = "tool-overlay-node pos-right";
                         node.style.transform = "rotate(45deg)";
                     }
                 } else {
