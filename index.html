@@ -72,6 +72,9 @@
         /* Invisible outline in studio */
         .obj-invisible-studio { background: transparent !important; background-image: none !important; border: 2px dashed #aaa !important; }
 
+        /* No outlines toggle */
+        .no-outlines { border-color: transparent !important; }
+
         .dropped-tool { position: absolute; width: 35px; height: 35px; border: 2px solid black; background: white; background-size: 70% 70%; background-repeat: no-repeat; background-position: center; z-index: 80; image-rendering: pixelated; }
         .dropped-tool.selected { outline: 2px dashed red; }
 
@@ -162,6 +165,7 @@
         <button id="btn-tool-move" class="tool-btn-pkg active" onclick="setActiveTool('move')"><img src="move.png" alt="Move"><span>Move</span></button>
         <button id="btn-tool-scale" class="tool-btn-pkg" onclick="setActiveTool('scale')"><img src="scale.png" alt="Scale"><span>Scale</span></button>
         <button id="btn-tool-rotate" class="tool-btn-pkg" onclick="setActiveTool('rotate')"><img src="rotate.png" alt="Rotate"><span>Rotate</span></button>
+        <button id="btn-toggle-outlines" class="action-btn" onclick="toggleOutlines()" style="font-size:11px;">Outlines: ON</button>
         <div style="flex:1;"></div>
         <div style="display:flex; align-items:center; gap:5px;">
             <label style="margin:0;">Players:</label>
@@ -311,6 +315,7 @@
     let totalMapMeters = 40;
     let activeToolState = 'move';
     let isPlaytesting = false;
+    let showOutlines = true; // toggle for part outlines in studio
 
     let sceneObjects = [];
     let droppedTools = [];
@@ -492,9 +497,9 @@
 
                 if (k === ' ' || k === 'f') triggerActivePlayerAttack();
 
-                // Jump
-                if ((k === ' ' || k === 'w' || k === 'arrowup') && ap.onGround && !ap.isCrouching) {
-                    ap.jumpVelocity = -14;
+                // Jump - only Space, not W (W is walk up)
+                if (k === ' ' && ap.onGround && !ap.isCrouching) {
+                    ap.jumpVelocity = -6;
                     ap.onGround = false;
                     ap.jumpHeight = 0;
                 }
@@ -561,6 +566,13 @@
         if (selectedObjectTarget) selectObjectTarget(selectedObjectTarget);
     }
 
+    function toggleOutlines() {
+        showOutlines = !showOutlines;
+        document.getElementById('btn-toggle-outlines').textContent = 'Outlines: ' + (showOutlines ? 'ON' : 'OFF');
+        // Re-render all objects to apply/remove outline styles
+        sceneObjects.forEach(o => updateObjectElementPositionDOM(o));
+    }
+
     // ─── SPAWN / RENDER OBJECTS ─────────────────────────────────────────────────
 
     function spawnToolElement(type) {
@@ -612,7 +624,7 @@
             id: "obj_" + objectIdCounter,
             type: primitiveType,
             shape: shapeGeometry,
-            left: 100, top: 100, width: 120, height: 60,
+            left: 100, top: 100, width: 120, height: 120,
             rotation: 0, material: 'plastic', color: '#e6c280',
             text: 'Sign Post',
             visibility: 10,
@@ -623,11 +635,14 @@
             telepadLink: '', telepadOneWay: false
         };
         if (primitiveType === 'telepad') {
-            newObj.color = '#00ccff';
-            newObj.width = 80; newObj.height = 30;
+            newObj.color = '#4488ff';
+            newObj.width = 120; newObj.height = 120;
+            newObj.visibility = 5;
+            newObj.collide = true;
         }
         if (primitiveType === 'shadow') {
             newObj.color = '#111111';
+            newObj.collide = false;
         }
         sceneObjects.push(newObj);
         renderObjectElementDOM(newObj);
@@ -653,19 +668,25 @@
         if (!el) return;
 
         let vis = (obj.visibility === undefined) ? 10 : obj.visibility;
-        let opacity = vis / 10;
+        let opacity = isPlaytesting ? vis / 10 : Math.max(vis / 10, 0.001); // always slightly visible in editor
 
         // Build class list
         let classes = `editor-obj shape-${obj.shape} mat-${obj.material}`;
         if (obj.type === 'kill')     classes += ' obj-kill';
         if (obj.type === 'spawn')    classes += ' obj-spawn';
         if (obj.type === 'spinning') classes += ' obj-spinning';
-        if (obj.type === 'telepad')  classes += ' obj-telepad';
         if (obj.type === 'shadow')   classes += ' obj-shadow';
         if (selectedObjectTarget && selectedObjectTarget.id === obj.id) classes += ' selected';
 
-        // Invisible studio outline
-        if (vis === 0) classes += ' obj-invisible-studio';
+        // Invisible: studio gets dashed outline, playtest gets truly invisible
+        if (vis === 0) {
+            if (!isPlaytesting) classes += ' obj-invisible-studio';
+        }
+
+        // Hide all shape borders when outlines are off (studio only)
+        if (!isPlaytesting && !showOutlines) {
+            classes += ' no-outlines';
+        }
 
         el.className = classes;
         el.style.left      = obj.left     + "px";
@@ -673,26 +694,29 @@
         el.style.width     = obj.width    + "px";
         el.style.height    = obj.height   + "px";
         el.style.transform = `rotate(${obj.rotation}deg)`;
-        el.style.opacity   = opacity;
+        el.style.opacity   = isPlaytesting && vis === 0 ? 0 : opacity;
+        el.style.zIndex    = obj.type === 'shadow' ? '200' : '';
+
+        // Color tinting for textured materials: apply as background-color overlay via filter
+        // We use a mix-blend approach: set bg color always, texture overlays on top via bg-image
+        let bgColor = obj.type === 'shadow' ? '#111' : obj.color;
 
         if (obj.shape === 'octagon') {
-            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="${obj.color}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="${bgColor}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
         } else if (obj.shape === 'wedge') {
-            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="0,100 100,0 100,100" fill="${obj.color}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="0,100 100,0 100,100" fill="${bgColor}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
         } else if (obj.shape === 'sign') {
             let fs = Math.max(10, Math.min(obj.height * 0.35, obj.width * 0.15));
             el.innerHTML = `<span style="font-size:${fs}px;"></span>`;
             el.querySelector('span').textContent = obj.text || '';
-            el.style.backgroundColor = (obj.material === 'plastic') ? obj.color : "transparent";
-        } else if (obj.type === 'telepad') {
-            el.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#006699;">TELEPORT</div>`;
-            el.style.backgroundColor = obj.color;
+            el.style.backgroundColor = bgColor;
         } else if (obj.type === 'shadow') {
             el.innerHTML = '';
             el.style.backgroundColor = '#111';
         } else {
             el.innerHTML = '';
-            el.style.backgroundColor = (obj.material === 'plastic') ? obj.color : "transparent";
+            // Always set background color - on materials it tints through the texture
+            el.style.backgroundColor = bgColor;
         }
     }
 
@@ -1097,23 +1121,21 @@
         if (!isPlaytesting || !activeControlledPlayerId) return;
         let ap = playersData[activeControlledPlayerId];
 
-        // Empty hand slot
-        let emptySlot = document.createElement('div');
-        emptySlot.className = "hotbar-slot" + (!ap.selectedTool ? " selected" : "");
-        emptySlot.title = "Empty hand";
-        emptySlot.style.fontSize = "18px";
-        emptySlot.style.display = "flex";
-        emptySlot.style.alignItems = "center";
-        emptySlot.style.justifyContent = "center";
-        emptySlot.textContent = "✋";
-        emptySlot.onclick = () => { ap.selectedTool = null; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); };
-        bar.appendChild(emptySlot);
-
         ap.inventory.forEach(tool => {
             let slot = document.createElement('div');
             slot.className = "hotbar-slot" + (ap.selectedTool === tool ? " selected" : "");
             slot.style.backgroundImage = `url('${tool}.png')`;
-            slot.onclick = () => { ap.selectedTool = tool; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); };
+            slot.title = tool;
+            slot.onclick = () => {
+                // clicking selected tool deselects it
+                if (ap.selectedTool === tool) {
+                    ap.selectedTool = null;
+                } else {
+                    ap.selectedTool = tool;
+                }
+                renderInventoryHotbarHUD();
+                syncHeldToolVisualsDOM();
+            };
             bar.appendChild(slot);
         });
     }
@@ -1193,6 +1215,7 @@
                 for (let j = obs.length-1; j >= 0; j--) {
                     let o = obs[j];
                     if (o.type === 'spawn' || o.type === 'shadow' || o.type === 'telepad') continue;
+                    if (!o.collide) continue; // bullets pass through non-collidable blocks
                     if (o.visibility === 0) continue;
                     if (checkShapeSpecificCollision(pBox, o.shape||'cube', o)) {
                         hit = true;
@@ -1234,18 +1257,27 @@
         let speed = ap.isCrouching ? baseSpeed * 0.4 : (ap.isRunning ? baseSpeed * 1.85 : baseSpeed);
 
         let moving = false;
-        let nextX = ap.x, nextY = ap.y;
+        let moveX = 0, moveY = 0;
 
         if (!ap.isCrouching) {
-            if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { nextY -= speed; moving = true; }
-            if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { nextY += speed; moving = true; }
+            if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { moveY -= 1; moving = true; }
+            if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { moveY += 1; moving = true; }
         }
-        if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { nextX -= speed; ap.facingDirection = 'left';  moving = true; }
-        if (keyLayoutState['d'] || keyLayoutState['arrowright']) { nextX += speed; ap.facingDirection = 'right'; moving = true; }
+        if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { moveX -= 1; ap.facingDirection = 'left';  moving = true; }
+        if (keyLayoutState['d'] || keyLayoutState['arrowright']) { moveX += 1; ap.facingDirection = 'right'; moving = true; }
+
+        // Normalize diagonal so you don't go sqrt(2)x faster
+        if (moveX !== 0 && moveY !== 0) {
+            moveX *= 0.7071;
+            moveY *= 0.7071;
+        }
+
+        let nextX = ap.x + moveX * speed;
+        let nextY = ap.y + moveY * speed;
 
         // Jump physics (visual offset only, not actual Y movement)
         if (!ap.onGround) {
-            ap.jumpVelocity += 40 * dt; // gravity
+            ap.jumpVelocity += 28 * dt; // gravity
             ap.jumpHeight -= ap.jumpVelocity;
             if (ap.jumpHeight <= 0) {
                 ap.jumpHeight = 0;
@@ -1256,7 +1288,7 @@
 
         // Conveyor / drag physics
         sceneObjects.forEach(obj => {
-            let box = { x: ap.x, y: ap.y, width: 75, height: 75 };
+            let box = { x: ap.x + 22, y: ap.y + 10, width: 30, height: 60 };
             if (checkShapeSpecificCollision(box, obj.shape, obj)) {
                 if (obj.dragOn) {
                     if (obj.type === 'moving' && obj.velocityX !== undefined) {
@@ -1283,19 +1315,29 @@
         nextX = Math.max(0, Math.min(mapLimit-75, nextX));
         nextY = Math.max(0, Math.min(mapLimit-75, nextY));
 
-        // Solid collision (axis-separated)
+        // Narrow hitbox: only the center 30px wide strip of the 75px character
+        // Character art is centered in the 75px container, actual body ~30px wide in middle
+        const HB_OFFSET_X = 22; // left padding before body starts
+        const HB_WIDTH    = 30; // actual body width
+        const HB_OFFSET_Y = 10; // top padding
+        const HB_HEIGHT   = 60; // actual body height
+
+        function playerHitbox(px, py) {
+            return { x: px + HB_OFFSET_X, y: py + HB_OFFSET_Y, width: HB_WIDTH, height: HB_HEIGHT };
+        }
+
+        // Solid collision (axis-separated) - skip non-collidable, shadow, telepad, spawn
         let hitH = false, hitV = false;
         let obstacles = [...sceneObjects, ...hammerBlocks];
         obstacles.forEach(obj => {
-            if (!obj.collide || obj.type === 'spawn') return;
-            if (obj.type === 'telepad' || obj.type === 'shadow') return;
-            if (obj.dragOn && checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, obj.shape||'cube', obj)) return;
-            if (ap.jumpHeight > 0 && obj.type === 'kill') return; // can jump over kill bricks
+            if (!obj.collide || obj.type === 'spawn' || obj.type === 'telepad' || obj.type === 'shadow') return;
+            if (obj.dragOn && checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), obj.shape||'cube', obj)) return;
+            if (ap.jumpHeight > 0 && obj.type === 'kill') return;
 
             let shape = obj.shape || 'cube';
-            let inside = checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, shape, obj);
-            if (checkShapeSpecificCollision({x: nextX, y: ap.y, width:75, height:75}, shape, obj) && !inside) hitH = true;
-            if (checkShapeSpecificCollision({x: ap.x, y: nextY, width:75, height:75}, shape, obj) && !inside) hitV = true;
+            let inside = checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), shape, obj);
+            if (checkShapeSpecificCollision(playerHitbox(nextX, ap.y), shape, obj) && !inside) hitH = true;
+            if (checkShapeSpecificCollision(playerHitbox(ap.x, nextY), shape, obj) && !inside) hitV = true;
         });
         if (!hitH) ap.x = nextX;
         if (!hitV) ap.y = nextY;
@@ -1303,21 +1345,27 @@
         // Kill bricks (only if not jumping over)
         sceneObjects.forEach(obj => {
             if (obj.type !== 'kill') return;
-            if (ap.jumpHeight > 20) return; // jumping clears kill bricks
-            if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, obj.shape, obj)) {
+            if (ap.jumpHeight > 20) return;
+            if (checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), obj.shape, obj)) {
                 damagePlayerTarget(ap, 100);
             }
         });
 
-        // Shadow blocks
+        // Shadow blocks: hide when inside, restore when outside
         sceneObjects.filter(o => o.type === 'shadow').forEach(obj => {
-            if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, 'cube', obj)) {
-                if (!ap.hiddenShadows.has(obj.id)) {
-                    ap.hiddenShadows.add(obj.id);
-                    if (activeControlledPlayerId === ap.id) {
-                        let el = document.getElementById(obj.id);
-                        if (el) el.style.display = 'none';
-                    }
+            let inside = checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), 'cube', obj);
+            let wasHidden = ap.hiddenShadows.has(obj.id);
+            if (inside && !wasHidden) {
+                ap.hiddenShadows.add(obj.id);
+                if (ap.id === activeControlledPlayerId) {
+                    let el = document.getElementById(obj.id);
+                    if (el) el.style.display = 'none';
+                }
+            } else if (!inside && wasHidden) {
+                ap.hiddenShadows.delete(obj.id);
+                if (ap.id === activeControlledPlayerId) {
+                    let el = document.getElementById(obj.id);
+                    if (el) el.style.display = '';
                 }
             }
         });
@@ -1328,7 +1376,7 @@
 
         if (teleportCooldowns[ap.id] <= 0) {
             sceneObjects.filter(o => o.type === 'telepad').forEach(pad => {
-                if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, 'cube', pad)) {
+                if (checkShapeSpecificCollision({x: ap.x+22, y: ap.y+10, width:30, height:60}, 'cube', pad)) {
                     if (ap.lastTelepadId === pad.id) return;
                     let dest = sceneObjects.find(o => o.id === pad.telepadLink && o.type === 'telepad');
                     if (dest) {
@@ -1346,7 +1394,7 @@
 
         // Tool pickups
         droppedTools.forEach((tool, idx) => {
-            if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, 'cube', {left: tool.left, top: tool.top, width:35, height:35})) {
+            if (checkShapeSpecificCollision({x: ap.x+22, y: ap.y+10, width:30, height:60}, 'cube', {left: tool.left, top: tool.top, width:35, height:35})) {
                 if (!ap.inventory.includes(tool.type)) {
                     ap.inventory.push(tool.type);
                     if (!ap.selectedTool) ap.selectedTool = tool.type;
