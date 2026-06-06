@@ -6,152 +6,41 @@
     <title>Arcadia Studio</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-            user-select: none;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif; user-select: none; }
+        body { background-color: white; color: black; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
 
-        body {
-            background-color: white;
-            color: black;
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #setup-overlay, #publish-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(255,255,255,0.95);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
+        #setup-overlay, #publish-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.95); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         #publish-overlay { display: none; background: rgba(0,0,0,0.5); }
+        .setup-box, .publish-box { border: 3px solid black; padding: 25px; width: 420px; background: white; max-height: 90vh; overflow-y: auto; }
 
-        .setup-box, .publish-box {
-            border: 3px solid black;
-            padding: 25px;
-            width: 420px;
-            background: white;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
+        #toolbar { height: 65px; border-bottom: 3px solid black; display: flex; align-items: center; padding: 0 15px; gap: 12px; background: white; z-index: 10; }
+        .tool-btn-pkg { display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 4px 10px; border: 2px solid transparent; background: none; }
+        .tool-btn-pkg img { width: 22px; height: 22px; object-fit: contain; margin-bottom: 2px; }
+        .tool-btn-pkg span { font-size: 11px; font-weight: bold; }
+        .tool-btn-pkg.active { border-color: black; background: #f0f0f0; }
+        .action-btn { padding: 6px 12px; border: 2px solid black; background: white; font-weight: bold; cursor: pointer; }
 
-        /* TOOLBAR */
-        #toolbar {
-            height: 65px;
-            border-bottom: 3px solid black;
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            gap: 12px;
-            background: white;
-            z-index: 10;
-        }
-        .tool-btn-pkg {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            padding: 4px 10px;
-            border: 2px solid transparent;
-            background: none;
-        }
-        .tool-btn-pkg img {
-            width: 22px;
-            height: 22px;
-            object-fit: contain;
-            margin-bottom: 2px;
-        }
-        .tool-btn-pkg span {
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .tool-btn-pkg.active {
-            border-color: black;
-            background: #f0f0f0;
-        }
-        .action-btn {
-            padding: 6px 12px;
-            border: 2px solid black;
-            background: white;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        #mp-switcher-bar {
-            display: none;
-            background: #f0f0f0;
-            border-bottom: 2px solid black;
-            padding: 5px 15px;
-            gap: 10px;
-            align-items: center;
-        }
-        .player-tab-btn {
-            padding: 4px 12px;
-            border: 2px solid black;
-            background: white;
-            font-weight: bold;
-            cursor: pointer;
-        }
+        #mp-switcher-bar { display: none; background: #f0f0f0; border-bottom: 2px solid black; padding: 5px 15px; gap: 10px; align-items: center; }
+        .player-tab-btn { padding: 4px 12px; border: 2px solid black; background: white; font-weight: bold; cursor: pointer; }
         .player-tab-btn.active { background: black; color: white; }
 
-        /* MAIN APP CONTAINER */
-        #workspace {
-            display: flex;
-            flex: 1;
-            height: calc(100vh - 65px);
-        }
-
-        #left-panel {
-            width: 280px;
-            border-right: 3px solid black;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            z-index: 5;
-        }
+        #workspace { display: flex; flex: 1; height: calc(100vh - 65px); }
+        #left-panel { width: 280px; border-right: 3px solid black; display: flex; flex-direction: column; background: white; z-index: 5; }
         .tab-headers { display: flex; border-bottom: 2px solid black; }
         .tab-btn { flex: 1; padding: 10px; background: white; border: none; cursor: pointer; font-weight: bold; }
         .tab-btn.active { background: black; color: white; }
-        
         .tab-content { display: none; padding: 15px; flex: 1; overflow-y: auto; }
         .tab-content.active { display: block; }
-        
-        .asset-card {
-            border: 2px solid black;
-            padding: 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            text-align: center;
-            font-weight: bold;
-            background: white;
-        }
+        .asset-card { border: 2px solid black; padding: 10px; margin-bottom: 10px; cursor: pointer; text-align: center; font-weight: bold; background: white; }
         .asset-card:hover { background: #f0f0f0; }
 
-        /* VIEWPORT WINDOW */
-        #viewport-container {
-            flex: 1;
-            background: #e0e0e0;
-            position: relative;
-            overflow: hidden;
-        }
-        #camera-space { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
-        #camera-space.smooth-track { transition: transform 0.1s ease-out; }
+        #viewport-container { flex: 1; background: #e0e0e0; position: relative; overflow: hidden; }
+        #camera-space { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; image-rendering: pixelated; }
         #map-grid { background: white; border: 3px solid black; position: relative; image-rendering: pixelated; }
 
-        /* GEOMETRY CORE GENERATORS & TEXTURES */
-        .editor-obj { position: absolute; box-sizing: border-box; background-repeat: repeat !important; background-size: 40px 40px !important; }
+        .editor-obj { position: absolute; box-sizing: border-box; background-repeat: repeat !important; background-size: 40px 40px !important; image-rendering: pixelated; }
         .editor-obj.selected { outline: 2px dashed black !important; outline-offset: 2px; }
-        
-        /* Material Texture Assignments */
+
         .editor-obj.mat-plastic { background-image: none; }
         .editor-obj.mat-grass { background-image: url('grass.png'); }
         .editor-obj.mat-brick { background-image: url('brick.png'); }
@@ -166,132 +55,81 @@
         .shape-halfcircle { border: 2px solid black; border-bottom: none; border-radius: 100px 100px 0 0; }
         .shape-arch { border: 2px solid black; border-bottom: none; border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
         .shape-octagon { border: none !important; background: transparent !important; }
-        
-        /* Sign Configuration Container */
-        .shape-sign {
-            border: 2px solid black;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            word-break: break-word;
-            padding: 4px;
-        }
-        .shape-sign span {
-            width: 100%;
-            display: block;
-            line-height: 1.1;
-            font-weight: bold;
-        }
+        .shape-sign { border: 2px solid black; display: flex; justify-content: center; align-items: center; text-align: center; word-break: break-word; padding: 4px; }
+        .shape-sign span { width: 100%; display: block; line-height: 1.1; font-weight: bold; }
+
+        /* Teleport pad */
+        .obj-telepad { border: 3px solid #00ccff; background: rgba(0,200,255,0.25) !important; background-image: none !important; border-radius: 8px; }
+        .obj-telepad-linked { border-color: #ff00ff; background: rgba(255,0,255,0.2) !important; }
+
+        /* Shadow block */
+        .obj-shadow { border: 2px solid #222; background: #111 !important; background-image: none !important; }
 
         .obj-spawn { border: 2px dashed green; background: rgba(0,255,0,0.15) !important; background-image: none !important; }
         .obj-kill { border: 2px solid red; background: rgba(255,0,0,0.2) !important; background-image: none !important; }
         .obj-spinning { border: 2px solid purple; }
 
-        .dropped-tool {
-            position: absolute; width: 35px; height: 35px; border: 2px solid black; background: white;
-            background-size: 70% 70%; background-repeat: no-repeat; background-position: center; z-index: 80;
-        }
+        /* Invisible outline in studio */
+        .obj-invisible-studio { background: transparent !important; background-image: none !important; border: 2px dashed #aaa !important; }
+
+        .dropped-tool { position: absolute; width: 35px; height: 35px; border: 2px solid black; background: white; background-size: 70% 70%; background-repeat: no-repeat; background-position: center; z-index: 80; image-rendering: pixelated; }
         .dropped-tool.selected { outline: 2px dashed red; }
 
-        /* GUN BULLET PROJECTILE ELEMENT */
-        .bullet-projectile {
-            position: absolute; width: 6px; height: 6px; background: #ffcc00; border: 1px solid black; border-radius: 50%; z-index: 98;
-        }
+        .bullet-projectile { position: absolute; width: 4px; height: 4px; background: #ffcc00; border: 1px solid black; border-radius: 50%; z-index: 98; }
 
-        /* SCALE NODES */
         .scale-handle { position: absolute; width: 16px; height: 16px; background: #00e1ff; border: 2px solid black; border-radius: 50% !important; z-index: 110; }
         .handle-t { top: -9px; left: calc(50% - 8px); cursor: ns-resize; }
         .handle-b { bottom: -9px; left: calc(50% - 8px); cursor: ns-resize; }
         .handle-l { left: -9px; top: calc(50% - 8px); cursor: ew-resize; }
         .handle-r { right: -9px; top: calc(50% - 8px); cursor: ew-resize; }
-        
         .rotate-handle { position: absolute; width: 16px; height: 16px; background: #ffff00; border: 2px solid black; border-radius: 50% !important; top: -32px; left: calc(50% - 8px); cursor: grab; z-index: 111; }
         .rotate-line { position: absolute; width: 2px; height: 18px; background: black; top: -18px; left: calc(50% - 1px); z-index: 109; }
 
-        /* PATH VISUALIZER NODES */
         .path-line-svg { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:4; }
         .visual-node-dot { position: absolute; width: 14px; height: 14px; border: 2px solid black; border-radius: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: auto; cursor: move; }
         .node-dot-a { background: #00ff55; }
         .node-dot-b { background: #ff0055; }
 
-        /* CHARACTERS & WIELDABLES */
-        .player-character {
-            position: absolute; width: 75px; height: 75px;
-            background-image: url('Character.png'); background-size: contain;
-            background-repeat: no-repeat; background-position: center; z-index: 95;
-        }
-        
-        .tool-overlay-node {
-            position: absolute; width: 42px; height: 42px;
-            background-size: contain; background-repeat: no-repeat;
-            bottom: 15px; z-index: 96;
-            transform-origin: bottom center;
-            transition: transform 0.05s ease-out;
-            display: none;
-        }
-        
-        .tool-overlay-node.pos-right {
-            left: 42px;
-            transform: rotate(35deg);
-        }
-        .tool-overlay-node.pos-left {
-            left: -8px;
-            transform: scaleX(-1) rotate(35deg);
-        }
+        /* Player character - uses image sprites */
+        .player-character { position: absolute; width: 75px; height: 75px; z-index: 95; image-rendering: pixelated; }
+        .player-character img.char-sprite { width: 75px; height: 75px; image-rendering: pixelated; display: block; }
 
         .health-bar-container { position: absolute; top: -15px; left: 7px; width: 60px; height: 6px; border: 1px solid black; background: red; }
         .health-bar-fill { width: 100%; height: 100%; background: #00ff00; }
         .player-label { position: absolute; top: -32px; left: 7px; width: 60px; text-align: center; font-size: 10px; font-weight: bold; background: rgba(255,255,255,0.7); }
 
-        /* FLOATING COOLDOWN TEXT STYLE */
-        #hammer-cooldown-indicator {
-            position: fixed;
-            pointer-events: none;
-            background: rgba(0, 0, 0, 0.85);
-            color: #ffff00;
-            padding: 4px 8px;
-            border: 2px solid black;
-            font-weight: bold;
-            font-size: 13px;
-            z-index: 5000;
-            display: none;
-            transform: translate(15px, 15px);
-        }
+        /* Stamina bar */
+        #stamina-bar-container { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); width: 120px; height: 8px; border: 2px solid black; background: #ccc; z-index: 99; display: none; }
+        #stamina-bar-fill { height: 100%; background: #00aaff; transition: width 0.1s; }
+        #stamina-label { position: absolute; top: -16px; left: 0; font-size: 10px; font-weight: bold; width: 100%; text-align: center; }
 
-        /* HOTBAR */
-        #hud-hotbar {
-            display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(255,255,255,0.9); border: 3px solid black; padding: 5px; gap: 8px; z-index: 99;
-        }
-        .hotbar-slot { 
-            width: 50px; height: 50px; border: 2px solid gray; background-color: white; 
-            background-size: 30px 30px; background-repeat: no-repeat; background-position: center; cursor: pointer; 
-        }
+        /* Crouch indicator */
+        #crouch-indicator { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: white; padding: 2px 8px; font-size: 11px; font-weight: bold; z-index: 99; display: none; border-radius: 3px; }
+
+        #hammer-cooldown-indicator { position: fixed; pointer-events: none; background: rgba(0,0,0,0.85); color: #ffff00; padding: 4px 8px; border: 2px solid black; font-weight: bold; font-size: 13px; z-index: 5000; display: none; transform: translate(15px, 15px); }
+
+        #hud-hotbar { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); border: 3px solid black; padding: 5px; gap: 8px; z-index: 99; }
+        .hotbar-slot { width: 50px; height: 50px; border: 2px solid gray; background-color: white; background-size: 30px 30px; background-repeat: no-repeat; background-position: center; cursor: pointer; image-rendering: pixelated; }
         .hotbar-slot.selected { border-color: black; background-color: #e0f0ff; }
 
-        /* PROPERTIES */
         #right-panel { width: 260px; border-left: 3px solid black; padding: 15px; background: white; overflow-y: auto; z-index: 5; }
         input, select, textarea { display: block; width: 100%; padding: 6px; margin-bottom: 12px; border: 2px solid black; background: white; }
         label { font-size: 11px; font-weight: bold; display: block; margin-bottom: 3px; }
         .inline-checkbox-container { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .inline-checkbox-container input { width: auto; margin: 0; }
 
-        #death-screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(220,0,0,0.9); color: white;
-            display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000;
-        }
+        #death-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(220,0,0,0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+
+        /* Jump shadow */
+        .jump-shadow { position: absolute; border-radius: 50%; background: rgba(0,0,0,0.18); z-index: 93; pointer-events: none; }
     </style>
 </head>
 <body>
-
     <div id="hammer-cooldown-indicator">Cooldown: 3</div>
 
     <div id="setup-overlay">
         <div class="setup-box">
-            <h2>Arcadia Studio</h2>
-            <br>
+            <h2>Arcadia Studio</h2><br>
             <label>Map Size (Meters):</label>
             <input type="number" id="map-size-input" value="40" min="10" max="200">
             <button class="action-btn" onclick="initializeStudioWorkspace()" style="width:100%;">Create Environment</button>
@@ -304,28 +142,14 @@
 
     <div id="publish-overlay">
         <div class="publish-box">
-            <h3>Publish Map</h3>
-            <br>
-            <label>Title:</label>
-            <input type="text" id="pub-title" placeholder="My Map">
-            
-            <label>Description:</label>
-            <textarea id="pub-desc" rows="2" placeholder="About this map..."></textarea>
-            
-            <label>Upload Game Icon:</label>
-            <input type="file" id="pub-icon" accept="image/*">
-
-            <label>Upload Thumbnail:</label>
-            <input type="file" id="pub-thumb" accept="image/*">
-
+            <h3>Publish Map</h3><br>
+            <label>Title:</label><input type="text" id="pub-title" placeholder="My Map">
+            <label>Description:</label><textarea id="pub-desc" rows="2" placeholder="About this map..."></textarea>
+            <label>Upload Game Icon:</label><input type="file" id="pub-icon" accept="image/*">
+            <label>Upload Thumbnail:</label><input type="file" id="pub-thumb" accept="image/*">
             <hr style="margin-bottom:12px;">
-            
-            <label>Creator Account Username:</label>
-            <input type="text" id="pub-user" placeholder="Username">
-
-            <label>Confirm Account Password:</label>
-            <input type="password" id="pub-pass" placeholder="••••••••">
-            
+            <label>Creator Account Username:</label><input type="text" id="pub-user" placeholder="Username">
+            <label>Confirm Account Password:</label><input type="password" id="pub-pass" placeholder="••••••••">
             <div style="display:flex; gap:10px;">
                 <button class="action-btn" style="flex:1; border-color:red;" onclick="document.getElementById('publish-overlay').style.display='none'">Cancel</button>
                 <button class="action-btn" style="flex:1; border-color:green;" onclick="executeProjectPublishPipeline()">Verify & Submit</button>
@@ -335,27 +159,14 @@
 
     <div id="toolbar">
         <span style="font-weight: bold; border-right: 2px solid black; padding-right: 15px;">Arcadia Studio</span>
-        
-        <button id="btn-tool-move" class="tool-btn-pkg active" onclick="setActiveTool('move')">
-            <img src="move.png" alt="Move">
-            <span>Move</span>
-        </button>
-        <button id="btn-tool-scale" class="tool-btn-pkg" onclick="setActiveTool('scale')">
-            <img src="scale.png" alt="Scale">
-            <span>Scale</span>
-        </button>
-        <button id="btn-tool-rotate" class="tool-btn-pkg" onclick="setActiveTool('rotate')">
-            <img src="rotate.png" alt="Rotate">
-            <span>Rotate</span>
-        </button>
-
+        <button id="btn-tool-move" class="tool-btn-pkg active" onclick="setActiveTool('move')"><img src="move.png" alt="Move"><span>Move</span></button>
+        <button id="btn-tool-scale" class="tool-btn-pkg" onclick="setActiveTool('scale')"><img src="scale.png" alt="Scale"><span>Scale</span></button>
+        <button id="btn-tool-rotate" class="tool-btn-pkg" onclick="setActiveTool('rotate')"><img src="rotate.png" alt="Rotate"><span>Rotate</span></button>
         <div style="flex:1;"></div>
-        
         <div style="display:flex; align-items:center; gap:5px;">
             <label style="margin:0;">Players:</label>
             <input type="number" id="mp-spawn-count" value="1" min="1" max="10" style="width:55px; margin:0; padding:3px;">
         </div>
-
         <button id="btn-playtest" class="action-btn" style="color: green; border-color: green;" onclick="togglePlaytestMode()">Playtest Game</button>
         <button class="action-btn" onclick="generateSaveString()">Save Game</button>
         <button class="action-btn" style="background: #e5ffdf;" onclick="document.getElementById('publish-overlay').style.display='flex'">Publish</button>
@@ -370,24 +181,23 @@
                 <button id="tab-btn-scripted" class="tab-btn" onclick="switchTab('scripted')">Logic</button>
                 <button id="tab-btn-tools" class="tab-btn" onclick="switchTab('tools')">Tools</button>
             </div>
-            
             <div id="tab-basic" class="tab-content active">
-                <div class="asset-card" onclick="spawnMapElement('cube', 'cube')">+ Cube</div>
-                <div class="asset-card" onclick="spawnMapElement('circle', 'circle')">+ Circle</div>
-                <div class="asset-card" onclick="spawnMapElement('wedge', 'wedge')">+ Wedge</div>
-                <div class="asset-card" onclick="spawnMapElement('halfcircle', 'halfcircle')">+ Half Circle</div>
-                <div class="asset-card" onclick="spawnMapElement('arch', 'arch')">+ Arch</div>
-                <div class="asset-card" onclick="spawnMapElement('octagon', 'octagon')">+ Octagon</div>
-                <div class="asset-card" onclick="spawnMapElement('sign', 'sign')">+ Sign Block</div>
-                <div class="asset-card" onclick="spawnMapElement('spawn', 'cube')">+ Spawnpoint</div>
+                <div class="asset-card" onclick="spawnMapElement('cube','cube')">+ Cube</div>
+                <div class="asset-card" onclick="spawnMapElement('circle','circle')">+ Circle</div>
+                <div class="asset-card" onclick="spawnMapElement('wedge','wedge')">+ Wedge</div>
+                <div class="asset-card" onclick="spawnMapElement('halfcircle','halfcircle')">+ Half Circle</div>
+                <div class="asset-card" onclick="spawnMapElement('arch','arch')">+ Arch</div>
+                <div class="asset-card" onclick="spawnMapElement('octagon','octagon')">+ Octagon</div>
+                <div class="asset-card" onclick="spawnMapElement('sign','sign')">+ Sign Block</div>
+                <div class="asset-card" onclick="spawnMapElement('spawn','cube')">+ Spawnpoint</div>
             </div>
-
             <div id="tab-scripted" class="tab-content">
-                <div class="asset-card" onclick="spawnMapElement('kill', 'cube')">+ Kill Brick</div>
-                <div class="asset-card" onclick="spawnMapElement('moving', 'cube')">+ Moving Block</div>
-                <div class="asset-card" onclick="spawnMapElement('spinning', 'cube')">+ Spinning Part</div>
+                <div class="asset-card" onclick="spawnMapElement('kill','cube')">+ Kill Brick</div>
+                <div class="asset-card" onclick="spawnMapElement('moving','cube')">+ Moving Block</div>
+                <div class="asset-card" onclick="spawnMapElement('spinning','cube')">+ Spinning Part</div>
+                <div class="asset-card" onclick="spawnMapElement('telepad','cube')">+ Teleport Pad</div>
+                <div class="asset-card" onclick="spawnMapElement('shadow','cube')">+ Shadow Block</div>
             </div>
-
             <div id="tab-tools" class="tab-content">
                 <div class="asset-card" onclick="spawnToolElement('sword')">+ Spawn Sword</div>
                 <div class="asset-card" onclick="spawnToolElement('hammer')">+ Spawn Hammer</div>
@@ -397,11 +207,9 @@
 
         <div id="viewport-container">
             <div id="death-screen">
-                <h1>You Died!</h1>
-                <br>
+                <h1>You Died!</h1><br>
                 <button class="action-btn" onclick="respawnActiveCharacter()">Respawn</button>
             </div>
-
             <div id="camera-space">
                 <div id="map-grid">
                     <svg id="path-visualizer-canvas" class="path-line-svg"></svg>
@@ -410,20 +218,17 @@
                     <div id="projectiles-layer"></div>
                 </div>
             </div>
-
             <div id="hud-hotbar" style="display: flex;"></div>
+            <div id="stamina-bar-container"><span id="stamina-label">Stamina</span><div id="stamina-bar-fill"></div></div>
+            <div id="crouch-indicator">CROUCHING</div>
         </div>
 
         <div id="right-panel">
-            <h3>Properties</h3>
-            <br><hr><br>
-            
+            <h3>Properties</h3><br><hr><br>
             <label>Map Size (Meters):</label>
             <input type="number" id="live-map-resize" value="40" min="10" max="300" oninput="changeMapDimensionsLive(this.value)">
             <br><hr><br>
-
             <div id="properties-empty-notice" style="color: gray; font-style: italic;">Select something to edit properties.</div>
-            
             <div id="properties-editor-form" style="display: none;">
                 <label>ID:</label>
                 <input type="text" id="prop-id" readonly style="background: #eee;">
@@ -436,6 +241,16 @@
                 <div id="prop-field-text" style="display: none;">
                     <label>Sign Text:</label>
                     <input type="text" id="prop-text" value="Hello World" oninput="updateSelectedObjectProperties()">
+                </div>
+
+                <div id="prop-field-telepad" style="display: none; border: 2px dashed #00ccff; padding: 10px; margin-bottom: 12px;">
+                    <label style="color:#0099cc;">Teleport Pad Setup:</label>
+                    <label>Link ID (pair with another pad):</label>
+                    <input type="text" id="prop-telepad-link" placeholder="e.g. obj_2" oninput="updateSelectedObjectProperties()">
+                    <div class="inline-checkbox-container">
+                        <input type="checkbox" id="prop-telepad-oneway" onchange="updateSelectedObjectProperties()">
+                        <label for="prop-telepad-oneway" style="margin:0; color:#0099cc;">One-Way (this pad only sends)</label>
+                    </div>
                 </div>
 
                 <div id="prop-field-material">
@@ -469,6 +284,11 @@
                     </select>
                 </div>
 
+                <div id="prop-field-visibility">
+                    <label>Visibility (0=invisible, 10=solid):</label>
+                    <input type="number" id="prop-visibility" min="0" max="10" value="10" oninput="updateSelectedObjectProperties()">
+                </div>
+
                 <div id="prop-field-drag" class="inline-checkbox-container" style="display: none;">
                     <input type="checkbox" id="prop-drag-on" onchange="updateSelectedObjectProperties()">
                     <label for="prop-drag-on" style="margin:0; color: blue; font-weight: bold;">Conveyor Physics (Rideable)</label>
@@ -485,1248 +305,1275 @@
     </div>
 
     <script>
-        const RegisteredUserAccountsDatabase = {
-            "admin": "password123",
-            "creator": "arcadia2026",
-            "player1": "testpass"
-        };
+    const RegisteredUserAccountsDatabase = { "admin": "password123", "creator": "arcadia2026", "player1": "testpass" };
 
-        let meterScaleFactor = 20;
-        let totalMapMeters = 40;
-        let activeToolState = 'move';
-        let isPlaytesting = false;
+    let meterScaleFactor = 20;
+    let totalMapMeters = 40;
+    let activeToolState = 'move';
+    let isPlaytesting = false;
 
-        let sceneObjects = [];
-        let droppedTools = [];
-        let hammerBlocks = [];
-        let activeProjectilesList = [];
-        let objectIdCounter = 0;
-        
-        let selectedObjectTarget = null;
-        let selectedToolNodeTarget = null;
-        let defaultStarterPack = [];
+    let sceneObjects = [];
+    let droppedTools = [];
+    let hammerBlocks = [];
+    let activeProjectilesList = [];
+    let objectIdCounter = 0;
 
-        let simulatePlayerCount = 1;
-        let playersData = {};
-        let activeControlledPlayerId = null;
+    let selectedObjectTarget = null;
+    let selectedToolNodeTarget = null;
+    let defaultStarterPack = [];
 
-        let hammerCooldownTimer = 0;
-        let hammerCooldownInterval = null;
-        let gunCooldownTimer = 0;
+    let simulatePlayerCount = 1;
+    let playersData = {};
+    let activeControlledPlayerId = null;
 
-        let camX = 50, camY = 50, currentZoomScale = 1.0;
-        let editorCamSpeed = 8;
+    let hammerCooldownTimer = 0;
+    let hammerCooldownInterval = null;
+    let gunCooldownTimer = 0;
 
-        let isDraggingTransform = false;
-        let startMouseX = 0, startMouseY = 0, startObjLeft = 0, startObjTop = 0, startObjWidth = 0, startObjHeight = 0;
-        let currentActiveScaleHandle = null;
+    // Camera uses requestAnimationFrame - no more setInterval jank
+    let camX = 50, camY = 50, currentZoomScale = 1.0;
+    let editorCamSpeed = 8;
+    let camRafId = null;
+    let lastCamTime = 0;
 
-        let isRotatingObj = false, centerPointX = 0, centerPointY = 0, startAngle = 0, baseRotation = 0;
+    let isDraggingTransform = false;
+    let startMouseX = 0, startMouseY = 0, startObjLeft = 0, startObjTop = 0, startObjWidth = 0, startObjHeight = 0;
+    let currentActiveScaleHandle = null;
 
-        let animationRuntimeLoop = null;
-        let playtestPhysicsLoop = null;
-        let keyLayoutState = {};
+    let isRotatingObj = false, centerPointX = 0, centerPointY = 0, startAngle = 0, baseRotation = 0;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            setupViewportCameraControls();
-            setupGlobalInputHandlers();
-            setupMapClicksForTools();
-            setupCooldownHUDTracking();
+    let animRafId = null;
+    let physicsRafId = null;
+    let keyLayoutState = {};
+
+    // Walk animation state
+    const WALK_FRAMES_NORMAL = ['Character.png','Character1.png','Character2.png','Character3.png'];
+    const WALK_FRAMES_HOLD   = ['Characterhold.png','Characterhold1.png','Characterhold2.png','Characterhold3.png'];
+    const CROUCH_FRAME       = 'crouch.png';
+    let walkAnimTimers = {}; // per player: { frame, timer }
+
+    // Teleport cooldown per player (avoid infinite loops)
+    let teleportCooldowns = {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setupViewportCameraControls();
+        setupGlobalInputHandlers();
+        setupMapClicksForTools();
+        setupCooldownHUDTracking();
+    });
+
+    // ─── CAMERA ─────────────────────────────────────────────────────────────────
+
+    function setupViewportCameraControls() {
+        document.getElementById('viewport-container').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            let factor = 0.08;
+            currentZoomScale = e.deltaY < 0
+                ? Math.min(4.0, currentZoomScale + factor)
+                : Math.max(0.3, currentZoomScale - factor);
+            updateCameraTransformDOM();
+        }, { passive: false });
+    }
+
+    function updateCameraTransformDOM() {
+        const cam = document.getElementById('camera-space');
+        if (cam) cam.style.transform = `translate(${Math.round(camX)}px, ${Math.round(camY)}px) scale(${currentZoomScale})`;
+    }
+
+    function updateCameraToActivePlayerFocus() {
+        if (!isPlaytesting || !activeControlledPlayerId) return;
+        const container = document.getElementById('viewport-container');
+        let target = playersData[activeControlledPlayerId];
+        if (!target) return;
+        currentZoomScale = 2.2;
+        camX = (container.clientWidth  / 2) - ((target.x + 37.5) * currentZoomScale);
+        camY = (container.clientHeight / 2) - ((target.y + 37.5) * currentZoomScale);
+        updateCameraTransformDOM();
+    }
+
+    // ─── SETUP ──────────────────────────────────────────────────────────────────
+
+    function setupCooldownHUDTracking() {
+        window.addEventListener('mousemove', (e) => {
+            let ind = document.getElementById('hammer-cooldown-indicator');
+            if (hammerCooldownTimer > 0 && isPlaytesting) {
+                ind.style.left = e.clientX + "px";
+                ind.style.top  = e.clientY + "px";
+            }
+        });
+    }
+
+    function initializeStudioWorkspace() {
+        totalMapMeters = parseInt(document.getElementById('map-size-input').value) || 40;
+        document.getElementById('live-map-resize').value = totalMapMeters;
+        updateMapGridDimensionsDOM();
+        document.getElementById('setup-overlay').style.display = "none";
+        updateCameraTransformDOM();
+        startMainLoop();
+    }
+
+    function startMainLoop() {
+        if (animRafId) cancelAnimationFrame(animRafId);
+
+        function loop(timestamp) {
+            let dt = Math.min((timestamp - lastCamTime) / 1000, 0.05);
+            lastCamTime = timestamp;
+
+            if (!isPlaytesting) {
+                let speed = editorCamSpeed;
+                let moved = false;
+                if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { camY += speed; moved = true; }
+                if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { camY -= speed; moved = true; }
+                if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { camX += speed; moved = true; }
+                if (keyLayoutState['d'] || keyLayoutState['arrowright']) { camX -= speed; moved = true; }
+                if (moved) updateCameraTransformDOM();
+            }
+
+            if (isPlaytesting && gunCooldownTimer > 0) gunCooldownTimer -= dt;
+
+            // Animate moving/spinning objects
+            sceneObjects.forEach(obj => {
+                if (obj.type === 'moving') {
+                    let oldL = obj.left, oldT = obj.top;
+                    advanceLinearNodeTrack(obj, dt);
+                    obj.velocityX = obj.left - oldL;
+                    obj.velocityY = obj.top - oldT;
+                    updateObjectElementPositionDOM(obj);
+                } else if (obj.type === 'spinning') {
+                    let prev = obj.rotation;
+                    obj.rotation = (obj.rotation + (obj.speed || 2)) % 360;
+                    obj.angularVelocity = obj.rotation - prev;
+                    updateObjectElementPositionDOM(obj);
+                }
+            });
+
+            if (!isPlaytesting && selectedObjectTarget && selectedObjectTarget.type === 'moving') {
+                renderWaypointsOverlayDOM(selectedObjectTarget);
+            }
+
+            animRafId = requestAnimationFrame(loop);
+        }
+        animRafId = requestAnimationFrame(loop);
+    }
+
+    function changeMapDimensionsLive(meters) {
+        let val = parseInt(meters);
+        if (val && val >= 10 && val <= 300) { totalMapMeters = val; updateMapGridDimensionsDOM(); }
+    }
+    function updateMapGridDimensionsDOM() {
+        const grid = document.getElementById('map-grid');
+        const px = totalMapMeters * meterScaleFactor;
+        grid.style.width = px + "px";
+        grid.style.height = px + "px";
+    }
+
+    // ─── INPUT ──────────────────────────────────────────────────────────────────
+
+    function setupGlobalInputHandlers() {
+        window.addEventListener('keydown', (e) => {
+            let k = e.key.toLowerCase();
+            if (keyLayoutState[k]) return; // already held
+            keyLayoutState[k] = true;
+
+            if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) {
+                if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') e.preventDefault();
+            }
+
+            if (isPlaytesting && activeControlledPlayerId) {
+                let ap = playersData[activeControlledPlayerId];
+
+                if (k === 'a' || k === 'arrowleft')  { ap.facingDirection = 'left';  syncHeldToolVisualsDOM(); }
+                if (k === 'd' || k === 'arrowright') { ap.facingDirection = 'right'; syncHeldToolVisualsDOM(); }
+
+                if (k === '1' && ap.inventory[0]) { ap.selectedTool = ap.inventory[0]; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); }
+                if (k === '2' && ap.inventory[1]) { ap.selectedTool = ap.inventory[1]; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); }
+                if (k === '3' && ap.inventory[2]) { ap.selectedTool = ap.inventory[2]; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); }
+                if (k === '0') { ap.selectedTool = null; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); }
+
+                if (k === ' ' || k === 'f') triggerActivePlayerAttack();
+
+                // Jump
+                if ((k === ' ' || k === 'w' || k === 'arrowup') && ap.onGround && !ap.isCrouching) {
+                    ap.jumpVelocity = -14;
+                    ap.onGround = false;
+                    ap.jumpHeight = 0;
+                }
+            }
         });
 
-        function setupViewportCameraControls() {
-            const container = document.getElementById('viewport-container');
-            
-            container.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                let zoomFactor = 0.08;
-                if (e.deltaY < 0) {
-                    currentZoomScale = Math.min(4.0, currentZoomScale + zoomFactor);
-                } else {
-                    currentZoomScale = Math.max(0.3, currentZoomScale - zoomFactor);
-                }
-                updateCameraTransformDOM();
-            }, { passive: false });
-        }
+        window.addEventListener('keyup', (e) => { keyLayoutState[e.key.toLowerCase()] = false; });
+        window.addEventListener('blur', () => { keyLayoutState = {}; });
+    }
 
-        function setupCooldownHUDTracking() {
-            window.addEventListener('mousemove', (e) => {
-                let indicator = document.getElementById('hammer-cooldown-indicator');
-                if (hammerCooldownTimer > 0 && isPlaytesting) {
-                    indicator.style.left = e.clientX + "px";
-                    indicator.style.top = e.clientY + "px";
-                }
-            });
-        }
+    function setupMapClicksForTools() {
+        window.addEventListener('mousedown', (e) => {
+            if (!isPlaytesting || !activeControlledPlayerId) return;
+            const viewContainer = document.getElementById('viewport-container');
+            if (!viewContainer.contains(e.target)) return;
+            if (document.getElementById('hud-hotbar').contains(e.target)) return;
 
-        function initializeStudioWorkspace() {
-            totalMapMeters = parseInt(document.getElementById('map-size-input').value) || 40;
-            document.getElementById('live-map-resize').value = totalMapMeters;
-            updateMapGridDimensionsDOM();
-            document.getElementById('setup-overlay').style.display = "none";
-            updateCameraTransformDOM();
-            
-            if(animationRuntimeLoop) clearInterval(animationRuntimeLoop);
-            animationRuntimeLoop = setInterval(() => {
-                if(!isPlaytesting) {
-                    let camMoved = false;
-                    if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { camY += editorCamSpeed; camMoved = true; }
-                    if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { camY -= editorCamSpeed; camMoved = true; }
-                    if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { camX += editorCamSpeed; camMoved = true; }
-                    if (keyLayoutState['d'] || keyLayoutState['arrowright']) { camX -= editorCamSpeed; camMoved = true; }
-                    if (camMoved) updateCameraTransformDOM();
-                }
+            let ap = playersData[activeControlledPlayerId];
+            if (ap.health <= 0) return;
 
-                if (isPlaytesting && gunCooldownTimer > 0) {
-                    gunCooldownTimer -= 0.016;
-                }
+            let rect = document.getElementById('map-grid').getBoundingClientRect();
+            let clickX = (e.clientX - rect.left) / currentZoomScale;
+            let clickY = (e.clientY - rect.top)  / currentZoomScale;
 
-                sceneObjects.forEach(obj => {
-                    if(obj.type === 'moving') {
-                        let oldLeft = obj.left;
-                        let oldTop = obj.top;
-                        advanceLinearNodeTrack(obj, 0.016);
-                        obj.velocityX = obj.left - oldLeft;
-                        obj.velocityY = obj.top - oldTop;
-                        updateObjectElementPositionDOM(obj);
-                    } else if(obj.type === 'spinning') {
-                        let prevRot = obj.rotation;
-                        obj.rotation = (obj.rotation + (obj.speed || 2)) % 360;
-                        obj.angularVelocity = obj.rotation - prevRot;
-                        updateObjectElementPositionDOM(obj);
-                    }
-                });
-                if(!isPlaytesting && selectedObjectTarget && selectedObjectTarget.type === 'moving') {
-                    renderWaypointsOverlayDOM(selectedObjectTarget);
-                }
-            }, 16);
-        }
-
-        function changeMapDimensionsLive(meters) {
-            let val = parseInt(meters);
-            if(val && val >= 10 && val <= 300) {
-                totalMapMeters = val;
-                updateMapGridDimensionsDOM();
+            if (ap.selectedTool === 'hammer') {
+                if (hammerCooldownTimer > 0) return;
+                buildHammerBlockAtClickLocation(clickX, clickY);
+                triggerHeldToolSlashEffect();
+                startHammerCooldownSequence();
+            } else if (ap.selectedTool === 'gun') {
+                fireRangedGunBullet(clickX, clickY);
+            } else if (ap.selectedTool === 'sword') {
+                triggerActivePlayerAttack();
             }
-        }
+        });
+    }
 
-        function updateMapGridDimensionsDOM() {
-            const grid = document.getElementById('map-grid');
-            const pxSize = totalMapMeters * meterScaleFactor;
-            grid.style.width = pxSize + "px";
-            grid.style.height = pxSize + "px";
-        }
+    function startHammerCooldownSequence() {
+        hammerCooldownTimer = 3;
+        let ind = document.getElementById('hammer-cooldown-indicator');
+        ind.textContent = "Cooldown: " + hammerCooldownTimer;
+        ind.style.display = "block";
+        if (hammerCooldownInterval) clearInterval(hammerCooldownInterval);
+        hammerCooldownInterval = setInterval(() => {
+            hammerCooldownTimer--;
+            if (hammerCooldownTimer <= 0) { clearInterval(hammerCooldownInterval); ind.style.display = "none"; }
+            else ind.textContent = "Cooldown: " + hammerCooldownTimer;
+        }, 1000);
+    }
 
-        function setupGlobalInputHandlers() {
-            window.addEventListener('keydown', (e) => {
-                let lowerKey = e.key.toLowerCase();
-                keyLayoutState[lowerKey] = true;
-                
-                if(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(lowerKey)) {
-                    if(document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
-                    }
-                }
+    // ─── TABS / TOOLS UI ────────────────────────────────────────────────────────
 
-                if(isPlaytesting && activeControlledPlayerId) {
-                    let activePlayer = playersData[activeControlledPlayerId];
-                    
-                    if(lowerKey === 'a' || lowerKey === 'arrowleft') {
-                        activePlayer.facingDirection = 'left';
-                        syncHeldToolVisualsDOM();
-                    }
-                    if(lowerKey === 'd' || lowerKey === 'arrowright') {
-                        activePlayer.facingDirection = 'right';
-                        syncHeldToolVisualsDOM();
-                    }
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-btn-' + tabId).classList.add('active');
+        document.getElementById('tab-' + tabId).classList.add('active');
+    }
 
-                    if(lowerKey === '1' && activePlayer.inventory[0]) {
-                        activePlayer.selectedTool = activePlayer.inventory[0];
-                        renderInventoryHotbarHUD();
-                        syncHeldToolVisualsDOM();
-                    }
-                    if(lowerKey === '2' && activePlayer.inventory[1]) {
-                        activePlayer.selectedTool = activePlayer.inventory[1];
-                        renderInventoryHotbarHUD();
-                        syncHeldToolVisualsDOM();
-                    }
-                    if(lowerKey === '3' && activePlayer.inventory[2]) {
-                        activePlayer.selectedTool = activePlayer.inventory[2];
-                        renderInventoryHotbarHUD();
-                        syncHeldToolVisualsDOM();
-                    }
-                    if(lowerKey === ' ' || lowerKey === 'f') {
-                        triggerActivePlayerAttack();
-                    }
-                }
-            });
+    function setActiveTool(toolMode) {
+        activeToolState = toolMode;
+        document.querySelectorAll('.tool-btn-pkg').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-tool-' + toolMode).classList.add('active');
+        if (selectedObjectTarget) selectObjectTarget(selectedObjectTarget);
+    }
 
-            window.addEventListener('keyup', (e) => { 
-                keyLayoutState[e.key.toLowerCase()] = false; 
-            });
+    // ─── SPAWN / RENDER OBJECTS ─────────────────────────────────────────────────
 
-            window.addEventListener('blur', () => {
-                keyLayoutState = {};
-            });
-        }
-
-        /* FIXED INTERCEPTION BUG: Global window click handler tracks actual viewport coordinates */
-        function setupMapClicksForTools() {
-            window.addEventListener('mousedown', (e) => {
-                if(!isPlaytesting || !activeControlledPlayerId) return;
-                
-                // Track back to view container parent to allow clicks anywhere inside viewport space
-                const viewContainer = document.getElementById('viewport-container');
-                if(!viewContainer.contains(e.target)) return;
-                
-                // Ignore clicks landing explicitly inside HUD hotbar
-                if(document.getElementById('hud-hotbar').contains(e.target)) return;
-
-                let activePlayer = playersData[activeControlledPlayerId];
-                if(activePlayer.health <= 0) return;
-
-                let rect = document.getElementById('map-grid').getBoundingClientRect();
-                let clickX = (e.clientX - rect.left) / currentZoomScale;
-                let clickY = (e.clientY - rect.top) / currentZoomScale;
-
-                if(activePlayer.selectedTool === 'hammer') {
-                    if (hammerCooldownTimer > 0) return; 
-                    buildHammerBlockAtClickLocation(clickX, clickY);
-                    triggerHeldToolSlashEffect();
-                    startHammerCooldownSequence();
-                } else if(activePlayer.selectedTool === 'gun') {
-                    fireRangedGunBullet(clickX, clickY);
-                } else if(activePlayer.selectedTool === 'sword') {
-                    triggerActivePlayerAttack();
-                }
-            });
-        }
-
-        function startHammerCooldownSequence() {
-            hammerCooldownTimer = 3;
-            let indicator = document.getElementById('hammer-cooldown-indicator');
-            indicator.textContent = "Cooldown: " + hammerCooldownTimer;
-            indicator.style.display = "block";
-
-            if (hammerCooldownInterval) clearInterval(hammerCooldownInterval);
-            hammerCooldownInterval = setInterval(() => {
-                hammerCooldownTimer--;
-                if (hammerCooldownTimer <= 0) {
-                    clearInterval(hammerCooldownInterval);
-                    indicator.style.display = "none";
-                } else {
-                    indicator.textContent = "Cooldown: " + hammerCooldownTimer;
-                }
-            }, 1000);
-        }
-
-        function updateCameraToActivePlayerFocus() {
-            if(!isPlaytesting || !activeControlledPlayerId) return;
-            const container = document.getElementById('viewport-container');
-            let target = playersData[activeControlledPlayerId];
-            if(!target) return;
-
-            currentZoomScale = 2.2; 
-            camX = (container.clientWidth / 2) - ((target.x + 37.5) * currentZoomScale);
-            camY = (container.clientHeight / 2) - ((target.y + 37.5) * currentZoomScale);
-            updateCameraTransformDOM();
-        }
-
-        function updateCameraTransformDOM() {
-            const cam = document.getElementById('camera-space');
-            if(cam) cam.style.transform = `translate(${camX}px, ${camY}px) scale(${currentZoomScale})`;
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById('tab-btn-' + tabId).classList.add('active');
-            document.getElementById('tab-' + tabId).classList.add('active');
-        }
-
-        function setActiveTool(toolMode) {
-            activeToolState = toolMode;
-            document.querySelectorAll('.tool-btn-pkg').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-tool-' + toolMode).classList.add('active');
-            
-            if(selectedObjectTarget) {
-                selectObjectTarget(selectedObjectTarget);
-            }
-        }
-
-        function spawnToolElement(type) {
-            objectIdCounter++;
-            let dropId = "tool_drop_" + objectIdCounter;
-            let dropObj = { id: dropId, type: type, left: 150, top: 150 };
-            droppedTools.push(dropObj);
-
-            let el = document.createElement('div');
-            el.id = dropId;
-            el.className = 'dropped-tool';
-            el.style.backgroundImage = `url('${type}.png')`;
-            el.style.left = dropObj.left + "px";
-            el.style.top = dropObj.top + "px";
-            
-            el.addEventListener('mousedown', (e) => {
-                e.stopPropagation();
-                if(isPlaytesting) return;
-                selectToolNodeTarget(dropObj, el);
-                if(activeToolState === 'move') initiateTransformDrag(e, null);
-            });
-
-            document.getElementById('map-grid').appendChild(el);
+    function spawnToolElement(type) {
+        objectIdCounter++;
+        let id = "tool_drop_" + objectIdCounter;
+        let dropObj = { id, type, left: 150, top: 150 };
+        droppedTools.push(dropObj);
+        let el = document.createElement('div');
+        el.id = id; el.className = 'dropped-tool';
+        el.style.backgroundImage = `url('${type}.png')`;
+        el.style.left = dropObj.left + "px";
+        el.style.top  = dropObj.top  + "px";
+        el.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            if (isPlaytesting) return;
             selectToolNodeTarget(dropObj, el);
+            if (activeToolState === 'move') initiateTransformDrag(e, null);
+        });
+        document.getElementById('map-grid').appendChild(el);
+        selectToolNodeTarget(dropObj, el);
+    }
+
+    function selectToolNodeTarget(toolObj, el) {
+        clearSelectionStates();
+        selectedToolNodeTarget = { obj: toolObj, element: el };
+        el.classList.add('selected');
+        document.getElementById('properties-empty-notice').style.display = "none";
+        document.getElementById('properties-editor-form').style.display = "block";
+        document.getElementById('prop-id').value = toolObj.id;
+        document.getElementById('prop-field-tool-options').style.display = "block";
+        ['text','material','color','rotation','collision','speed','drag','telepad','visibility'].forEach(f => {
+            let el2 = document.getElementById('prop-field-' + f);
+            if (el2) el2.style.display = "none";
+        });
+    }
+
+    function moveSelectedToolToInventory() {
+        if (!selectedToolNodeTarget) return;
+        let type = selectedToolNodeTarget.obj.type;
+        if (!defaultStarterPack.includes(type)) { defaultStarterPack.push(type); alert(`Added ${type} to starter pack.`); }
+        document.getElementById(selectedToolNodeTarget.obj.id)?.remove();
+        droppedTools = droppedTools.filter(t => t.id !== selectedToolNodeTarget.obj.id);
+        clearSelectionStates();
+    }
+
+    function spawnMapElement(primitiveType, shapeGeometry) {
+        objectIdCounter++;
+        let newObj = {
+            id: "obj_" + objectIdCounter,
+            type: primitiveType,
+            shape: shapeGeometry,
+            left: 100, top: 100, width: 120, height: 60,
+            rotation: 0, material: 'plastic', color: '#e6c280',
+            text: 'Sign Post',
+            visibility: 10,
+            collide: primitiveType !== 'kill' && primitiveType !== 'spawn' && primitiveType !== 'shadow',
+            speed: primitiveType === 'spinning' ? 3 : 4,
+            dragOn: true,
+            nodeA: { x: 100, y: 100 }, nodeB: { x: 300, y: 100 }, targetNode: 'B',
+            telepadLink: '', telepadOneWay: false
+        };
+        if (primitiveType === 'telepad') {
+            newObj.color = '#00ccff';
+            newObj.width = 80; newObj.height = 30;
         }
+        if (primitiveType === 'shadow') {
+            newObj.color = '#111111';
+        }
+        sceneObjects.push(newObj);
+        renderObjectElementDOM(newObj);
+        selectObjectTarget(newObj);
+    }
 
-        function selectToolNodeTarget(toolObj, el) {
-            clearSelectionStates();
-            selectedToolNodeTarget = { obj: toolObj, element: el };
-            el.classList.add('selected');
+    function renderObjectElementDOM(obj) {
+        const el = document.createElement('div');
+        el.id = obj.id;
+        el.className = `editor-obj shape-${obj.shape}`;
+        el.addEventListener('mousedown', (e) => {
+            if (isPlaytesting) return;
+            e.stopPropagation();
+            selectObjectTarget(obj);
+            if (activeToolState === 'move') initiateTransformDrag(e, null);
+        });
+        document.getElementById('map-grid').appendChild(el);
+        updateObjectElementPositionDOM(obj);
+    }
 
-            document.getElementById('properties-empty-notice').style.display = "none";
-            document.getElementById('properties-editor-form').style.display = "block";
-            
-            document.getElementById('prop-id').value = toolObj.id;
-            document.getElementById('prop-field-tool-options').style.display = "block";
-            
+    function updateObjectElementPositionDOM(obj) {
+        const el = document.getElementById(obj.id);
+        if (!el) return;
+
+        let vis = (obj.visibility === undefined) ? 10 : obj.visibility;
+        let opacity = vis / 10;
+
+        // Build class list
+        let classes = `editor-obj shape-${obj.shape} mat-${obj.material}`;
+        if (obj.type === 'kill')     classes += ' obj-kill';
+        if (obj.type === 'spawn')    classes += ' obj-spawn';
+        if (obj.type === 'spinning') classes += ' obj-spinning';
+        if (obj.type === 'telepad')  classes += ' obj-telepad';
+        if (obj.type === 'shadow')   classes += ' obj-shadow';
+        if (selectedObjectTarget && selectedObjectTarget.id === obj.id) classes += ' selected';
+
+        // Invisible studio outline
+        if (vis === 0) classes += ' obj-invisible-studio';
+
+        el.className = classes;
+        el.style.left      = obj.left     + "px";
+        el.style.top       = obj.top      + "px";
+        el.style.width     = obj.width    + "px";
+        el.style.height    = obj.height   + "px";
+        el.style.transform = `rotate(${obj.rotation}deg)`;
+        el.style.opacity   = opacity;
+
+        if (obj.shape === 'octagon') {
+            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="${obj.color}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+        } else if (obj.shape === 'wedge') {
+            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="0,100 100,0 100,100" fill="${obj.color}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+        } else if (obj.shape === 'sign') {
+            let fs = Math.max(10, Math.min(obj.height * 0.35, obj.width * 0.15));
+            el.innerHTML = `<span style="font-size:${fs}px;"></span>`;
+            el.querySelector('span').textContent = obj.text || '';
+            el.style.backgroundColor = (obj.material === 'plastic') ? obj.color : "transparent";
+        } else if (obj.type === 'telepad') {
+            el.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#006699;">TELEPORT</div>`;
+            el.style.backgroundColor = obj.color;
+        } else if (obj.type === 'shadow') {
+            el.innerHTML = '';
+            el.style.backgroundColor = '#111';
+        } else {
+            el.innerHTML = '';
+            el.style.backgroundColor = (obj.material === 'plastic') ? obj.color : "transparent";
+        }
+    }
+
+    // ─── SELECTION / PROPERTIES ─────────────────────────────────────────────────
+
+    function selectObjectTarget(obj) {
+        clearSelectionStates();
+        selectedObjectTarget = obj;
+        const el = document.getElementById(obj.id);
+        if (el) el.classList.add('selected');
+
+        document.getElementById('properties-empty-notice').style.display = "none";
+        document.getElementById('properties-editor-form').style.display = "block";
+
+        document.getElementById('prop-id').value           = obj.id;
+        document.getElementById('prop-material').value     = obj.material;
+        document.getElementById('prop-color').value        = obj.color;
+        document.getElementById('prop-rotation').value     = obj.rotation;
+        document.getElementById('prop-collide').value      = obj.collide.toString();
+        document.getElementById('prop-speed').value        = obj.speed || 4;
+        document.getElementById('prop-drag-on').checked    = obj.dragOn !== false;
+        document.getElementById('prop-visibility').value   = (obj.visibility === undefined) ? 10 : obj.visibility;
+
+        document.getElementById('prop-field-color').style.display      = "block";
+        document.getElementById('prop-field-rotation').style.display   = "block";
+        document.getElementById('prop-field-visibility').style.display = "block";
+        document.getElementById('prop-field-collision').style.display  = "block";
+        document.getElementById('prop-field-tool-options').style.display = "none";
+
+        document.getElementById('prop-field-speed').style.display = (obj.type === 'moving' || obj.type === 'spinning') ? "block" : "none";
+        document.getElementById('prop-field-drag').style.display  = (obj.type === 'moving' || obj.type === 'spinning') ? "flex"  : "none";
+
+        if (obj.shape === 'sign') {
+            document.getElementById('prop-field-text').style.display = "block";
+            document.getElementById('prop-text').value = obj.text || '';
+        } else {
             document.getElementById('prop-field-text').style.display = "none";
-            document.getElementById('prop-field-material').style.display = "none";
-            document.getElementById('prop-field-color').style.display = "none";
-            document.getElementById('prop-field-rotation').style.display = "none";
-            document.getElementById('prop-field-collision').style.display = "none";
-            document.getElementById('prop-field-speed').style.display = "none";
-            document.getElementById('prop-field-drag').style.display = "none";
         }
 
-        function moveSelectedToolToInventory() {
-            if(!selectedToolNodeTarget) return;
-            let type = selectedToolNodeTarget.obj.type;
-            if(!defaultStarterPack.includes(type)) {
-                defaultStarterPack.push(type);
-                alert(`Added ${type} to starter pack.`);
-            }
+        if (obj.type === 'telepad') {
+            document.getElementById('prop-field-telepad').style.display = "block";
+            document.getElementById('prop-telepad-link').value           = obj.telepadLink || '';
+            document.getElementById('prop-telepad-oneway').checked       = obj.telepadOneWay || false;
+        } else {
+            document.getElementById('prop-field-telepad').style.display = "none";
+        }
+
+        if (!isPlaytesting) {
+            if (activeToolState === 'scale')  appendScaleHandlesDOM(el);
+            if (activeToolState === 'rotate') appendRotateHandleDOM(el);
+            if (obj.type === 'moving') renderWaypointsOverlayDOM(obj);
+        }
+    }
+
+    function clearSelectionStates() {
+        selectedObjectTarget = null;
+        if (selectedToolNodeTarget) {
+            selectedToolNodeTarget.element.classList.remove('selected');
+            selectedToolNodeTarget = null;
+        }
+        document.querySelectorAll('.editor-obj, .dropped-tool').forEach(el => {
+            el.classList.remove('selected');
+            el.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
+        });
+        document.getElementById('path-visualizer-canvas').innerHTML = "";
+        document.getElementById('path-nodes-layer').innerHTML = "";
+        document.getElementById('properties-editor-form').style.display = "none";
+        document.getElementById('properties-empty-notice').style.display = "block";
+        document.getElementById('prop-field-tool-options').style.display = "none";
+        document.getElementById('prop-field-text').style.display = "none";
+        document.getElementById('prop-field-material').style.display = "block";
+        document.getElementById('prop-field-color').style.display = "block";
+        document.getElementById('prop-field-rotation').style.display = "block";
+        document.getElementById('prop-field-collision').style.display = "block";
+        document.getElementById('prop-field-telepad').style.display = "none";
+    }
+
+    function updateSelectedObjectProperties() {
+        if (!selectedObjectTarget) return;
+        selectedObjectTarget.material    = document.getElementById('prop-material').value;
+        selectedObjectTarget.color       = document.getElementById('prop-color').value;
+        selectedObjectTarget.rotation    = parseInt(document.getElementById('prop-rotation').value) || 0;
+        selectedObjectTarget.collide     = (document.getElementById('prop-collide').value === "true");
+        selectedObjectTarget.speed       = parseFloat(document.getElementById('prop-speed').value) || 4;
+        selectedObjectTarget.dragOn      = document.getElementById('prop-drag-on').checked;
+        selectedObjectTarget.visibility  = parseInt(document.getElementById('prop-visibility').value);
+        if (isNaN(selectedObjectTarget.visibility)) selectedObjectTarget.visibility = 10;
+        selectedObjectTarget.visibility  = Math.max(0, Math.min(10, selectedObjectTarget.visibility));
+
+        if (selectedObjectTarget.shape === 'sign') selectedObjectTarget.text = document.getElementById('prop-text').value;
+        if (selectedObjectTarget.type === 'telepad') {
+            selectedObjectTarget.telepadLink   = document.getElementById('prop-telepad-link').value.trim();
+            selectedObjectTarget.telepadOneWay = document.getElementById('prop-telepad-oneway').checked;
+        }
+        updateObjectElementPositionDOM(selectedObjectTarget);
+    }
+
+    function deleteSelectedObject() {
+        if (selectedToolNodeTarget) {
             document.getElementById(selectedToolNodeTarget.obj.id)?.remove();
             droppedTools = droppedTools.filter(t => t.id !== selectedToolNodeTarget.obj.id);
-            clearSelectionStates();
+            clearSelectionStates(); return;
         }
+        if (!selectedObjectTarget) return;
+        document.getElementById(selectedObjectTarget.id)?.remove();
+        sceneObjects = sceneObjects.filter(o => o.id !== selectedObjectTarget.id);
+        clearSelectionStates();
+    }
 
-        function togglePlaytestMode() {
-            if(!isPlaytesting) {
-                let spawnObj = sceneObjects.find(o => o.type === 'spawn');
-                if(!spawnObj) return alert("Add a spawnpoint to playtest!");
+    // ─── SCALE / ROTATE / WAYPOINTS ─────────────────────────────────────────────
 
-                simulatePlayerCount = Math.max(1, Math.min(10, parseInt(document.getElementById('mp-spawn-count').value) || 1));
-                clearSelectionStates();
-                isPlaytesting = true;
-                gunCooldownTimer = 0;
-                
-                document.getElementById('camera-space').classList.add('smooth-track');
-                document.getElementById('btn-playtest').textContent = "Stop Test";
-                document.getElementById('btn-playtest').style.borderColor = "red";
-                document.getElementById('btn-playtest').style.color = "red";
+    function appendScaleHandlesDOM(parentEl) {
+        if (!parentEl) return;
+        ['t','b','l','r'].forEach(dir => {
+            const h = document.createElement('div');
+            h.className = `scale-handle handle-${dir}`;
+            h.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateTransformDrag(e, dir); });
+            parentEl.appendChild(h);
+        });
+    }
 
-                const switcher = document.getElementById('mp-switcher-bar');
-                switcher.innerHTML = '<span style="font-size:12px; font-weight:bold; margin-right:10px;">Control Player:</span>';
-                switcher.style.display = "flex";
+    function appendRotateHandleDOM(parentEl) {
+        if (!parentEl) return;
+        const line = document.createElement('div'); line.className = 'rotate-line';
+        const h    = document.createElement('div'); h.className = 'rotate-handle';
+        h.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateMouseRotation(e); });
+        parentEl.appendChild(line); parentEl.appendChild(h);
+    }
 
-                document.getElementById('players-layer').innerHTML = "";
-                playersData = {};
+    function renderWaypointsOverlayDOM(obj) {
+        let canvas = document.getElementById('path-visualizer-canvas');
+        let layer  = document.getElementById('path-nodes-layer');
+        if (!canvas || !layer) return;
+        let cX1 = obj.nodeA.x + obj.width/2, cY1 = obj.nodeA.y + obj.height/2;
+        let cX2 = obj.nodeB.x + obj.width/2, cY2 = obj.nodeB.y + obj.height/2;
+        canvas.innerHTML = `<line x1="${cX1}" y1="${cY1}" x2="${cX2}" y2="${cY2}" stroke="black" stroke-width="3" stroke-dasharray="6,6"/>`;
+        if (layer.children.length === 0) {
+            let dA = document.createElement('div'); dA.className = "visual-node-dot node-dot-a"; dA.title = "Waypoint A";
+            dA.addEventListener('mousedown', (e) => initiateWaypointNodeDrag(e, obj, 'nodeA'));
+            let dB = document.createElement('div'); dB.className = "visual-node-dot node-dot-b"; dB.title = "Waypoint B";
+            dB.addEventListener('mousedown', (e) => initiateWaypointNodeDrag(e, obj, 'nodeB'));
+            layer.appendChild(dA); layer.appendChild(dB);
+        }
+        layer.children[0].style.left = cX1 + "px"; layer.children[0].style.top = cY1 + "px";
+        layer.children[1].style.left = cX2 + "px"; layer.children[1].style.top = cY2 + "px";
+    }
 
-                let sx = spawnObj.left + (spawnObj.width / 2) - 37.5;
-                let sy = spawnObj.top + (spawnObj.height / 2) - 37.5;
+    function initiateWaypointNodeDrag(e, obj, nodeKey) {
+        e.stopPropagation();
+        let sX = e.clientX, sY = e.clientY, bX = obj[nodeKey].x, bY = obj[nodeKey].y;
+        let mm = (ev) => { obj[nodeKey].x = bX + (ev.clientX-sX)/currentZoomScale; obj[nodeKey].y = bY + (ev.clientY-sY)/currentZoomScale; renderWaypointsOverlayDOM(obj); };
+        let mu = () => { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
+        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+    }
 
-                for(let i = 1; i <= simulatePlayerCount; i++) {
-                    let pId = "player_" + i;
-                    playersData[pId] = {
-                        id: pId,
-                        name: "Player " + i,
-                        x: sx + (i * 12), y: sy,
-                        health: 100,
-                        inventory: [...defaultStarterPack],
-                        selectedTool: defaultStarterPack[0] || null,
-                        facingDirection: 'right'
-                    };
+    function initiateMouseRotation(e) {
+        if (!selectedObjectTarget) return;
+        isRotatingObj = true;
+        const el = document.getElementById(selectedObjectTarget.id);
+        const rect = el.getBoundingClientRect();
+        centerPointX = rect.left + rect.width/2; centerPointY = rect.top + rect.height/2;
+        startAngle  = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX) * (180/Math.PI);
+        baseRotation = selectedObjectTarget.rotation;
+        let mm = (ev) => {
+            if (!isRotatingObj) return;
+            let cur = Math.atan2(ev.clientY - centerPointY, ev.clientX - centerPointX) * (180/Math.PI);
+            selectedObjectTarget.rotation = Math.round((baseRotation + (cur - startAngle)) % 360);
+            if (selectedObjectTarget.rotation < 0) selectedObjectTarget.rotation += 360;
+            document.getElementById('prop-rotation').value = selectedObjectTarget.rotation;
+            updateObjectElementPositionDOM(selectedObjectTarget);
+        };
+        let mu = () => { isRotatingObj = false; document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
+        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+    }
 
-                    let tab = document.createElement('button');
-                    tab.className = "player-tab-btn" + (i === 1 ? " active" : "");
-                    tab.textContent = "Player " + i;
-                    tab.onclick = () => switchActiveControlledPlayer(pId);
-                    switcher.appendChild(tab);
+    function initiateTransformDrag(e, handleDir) {
+        isDraggingTransform = true;
+        currentActiveScaleHandle = handleDir;
+        startMouseX = e.clientX; startMouseY = e.clientY;
+        if (selectedToolNodeTarget) {
+            startObjLeft = selectedToolNodeTarget.obj.left;
+            startObjTop  = selectedToolNodeTarget.obj.top;
+        } else if (selectedObjectTarget) {
+            startObjLeft   = selectedObjectTarget.left;   startObjTop    = selectedObjectTarget.top;
+            startObjWidth  = selectedObjectTarget.width;  startObjHeight = selectedObjectTarget.height;
+        }
+        let mm = (ev) => processTransformDrag(ev);
+        let mu = () => { isDraggingTransform = false; document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
+        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+    }
 
-                    let pEl = document.createElement('div');
-                    pEl.id = "char_" + pId;
-                    pEl.className = "player-character";
-                    pEl.style.left = playersData[pId].x + "px";
-                    pEl.style.top = playersData[pId].y + "px";
-
-                    pEl.innerHTML = `
-                        <div class="player-label">${playersData[pId].name}</div>
-                        <div class="health-bar-container"><div id="hp_fill_${pId}" class="health-bar-fill"></div></div>
-                        <div id="wield_node_${pId}" class="tool-overlay-node"></div>
-                    `;
-                    document.getElementById('players-layer').appendChild(pEl);
-                }
-
-                activeControlledPlayerId = "player_1";
-                renderInventoryHotbarHUD();
-                syncHeldToolVisualsDOM();
-                updateCameraToActivePlayerFocus();
-                runPlaytestPhysicsLoop();
-            } else {
-                isPlaytesting = false;
-                hammerCooldownTimer = 0;
-                gunCooldownTimer = 0;
-                if(hammerCooldownInterval) clearInterval(hammerCooldownInterval);
-                document.getElementById('hammer-cooldown-indicator').style.display = "none";
-
-                document.getElementById('camera-space').classList.remove('smooth-track');
-                document.getElementById('mp-switcher-bar').style.display = "none";
-                document.getElementById('hud-hotbar').innerHTML = "";
-                document.getElementById('btn-playtest').textContent = "Playtest Game";
-                document.getElementById('btn-playtest').style.borderColor = "green";
-                document.getElementById('btn-playtest').style.color = "green";
-                document.getElementById('death-screen').style.display = "none";
-
-                clearInterval(playtestPhysicsLoop);
-                document.getElementById('players-layer').innerHTML = "";
-                
-                hammerBlocks.forEach(b => document.getElementById(b.id)?.remove());
-                hammerBlocks = [];
-
-                activeProjectilesList.forEach(p => document.getElementById(p.id)?.remove());
-                activeProjectilesList = [];
-
-                camX = 50; camY = 50; currentZoomScale = 1.0;
-                updateCameraTransformDOM();
+    function processTransformDrag(e) {
+        if (!isDraggingTransform) return;
+        let dX = (e.clientX - startMouseX) / currentZoomScale;
+        let dY = (e.clientY - startMouseY) / currentZoomScale;
+        if (selectedToolNodeTarget) {
+            selectedToolNodeTarget.obj.left = startObjLeft + dX;
+            selectedToolNodeTarget.obj.top  = startObjTop  + dY;
+            selectedToolNodeTarget.element.style.left = selectedToolNodeTarget.obj.left + "px";
+            selectedToolNodeTarget.element.style.top  = selectedToolNodeTarget.obj.top  + "px";
+            return;
+        }
+        if (activeToolState === 'move') {
+            selectedObjectTarget.left = startObjLeft + dX;
+            selectedObjectTarget.top  = startObjTop  + dY;
+            if (selectedObjectTarget.type === 'moving') {
+                selectedObjectTarget.nodeA.x = selectedObjectTarget.left;
+                selectedObjectTarget.nodeB.x = selectedObjectTarget.left + 200;
+            }
+        } else if (activeToolState === 'scale' && currentActiveScaleHandle) {
+            let rad = (selectedObjectTarget.rotation || 0) * Math.PI / 180;
+            let lDX = dX * Math.cos(-rad) - dY * Math.sin(-rad);
+            let lDY = dX * Math.sin(-rad) + dY * Math.cos(-rad);
+            if (currentActiveScaleHandle === 'r') selectedObjectTarget.width  = Math.max(15, startObjWidth  + lDX);
+            if (currentActiveScaleHandle === 'b') selectedObjectTarget.height = Math.max(15, startObjHeight + lDY);
+            if (currentActiveScaleHandle === 'l') {
+                let nW = Math.max(15, startObjWidth - lDX); let ch = startObjWidth - nW;
+                selectedObjectTarget.width = nW; selectedObjectTarget.left = startObjLeft + ch * Math.cos(rad); selectedObjectTarget.top = startObjTop + ch * Math.sin(rad);
+            }
+            if (currentActiveScaleHandle === 't') {
+                let nH = Math.max(15, startObjHeight - lDY); let ch = startObjHeight - nH;
+                selectedObjectTarget.height = nH; selectedObjectTarget.left = startObjLeft - ch * Math.sin(rad); selectedObjectTarget.top = startObjTop + ch * Math.cos(rad);
             }
         }
+        updateObjectElementPositionDOM(selectedObjectTarget);
+        if (activeToolState === 'scale') appendScaleHandlesDOM(document.getElementById(selectedObjectTarget.id));
+    }
 
-        function switchActiveControlledPlayer(pId) {
-            if(!isPlaytesting) return;
-            activeControlledPlayerId = pId;
-            document.querySelectorAll('.player-tab-btn').forEach((btn, idx) => {
-                btn.classList.toggle('active', ("player_" + (idx + 1)) === pId);
-            });
+    // ─── PLAYTEST ────────────────────────────────────────────────────────────────
+
+    function togglePlaytestMode() {
+        if (!isPlaytesting) {
+            let spawnObj = sceneObjects.find(o => o.type === 'spawn');
+            if (!spawnObj) return alert("Add a spawnpoint to playtest!");
+
+            simulatePlayerCount = Math.max(1, Math.min(10, parseInt(document.getElementById('mp-spawn-count').value) || 1));
+            clearSelectionStates();
+            isPlaytesting = true;
+            gunCooldownTimer = 0;
+
+            document.getElementById('btn-playtest').textContent   = "Stop Test";
+            document.getElementById('btn-playtest').style.borderColor = "red";
+            document.getElementById('btn-playtest').style.color       = "red";
+
+            const switcher = document.getElementById('mp-switcher-bar');
+            switcher.innerHTML = '<span style="font-size:12px;font-weight:bold;margin-right:10px;">Control Player:</span>';
+            switcher.style.display = "flex";
+
+            document.getElementById('players-layer').innerHTML = "";
+            playersData = {};
+            walkAnimTimers = {};
+            teleportCooldowns = {};
+
+            let sx = spawnObj.left + spawnObj.width/2 - 37.5;
+            let sy = spawnObj.top  + spawnObj.height/2 - 37.5;
+
+            for (let i = 1; i <= simulatePlayerCount; i++) {
+                let pId = "player_" + i;
+                playersData[pId] = {
+                    id: pId, name: "Player " + i,
+                    x: sx + i*12, y: sy,
+                    health: 100,
+                    inventory: [...defaultStarterPack],
+                    selectedTool: defaultStarterPack[0] || null,
+                    facingDirection: 'right',
+                    // movement states
+                    stamina: 100,
+                    isCrouching: false,
+                    isRunning: false,
+                    // jump
+                    jumpVelocity: 0,
+                    jumpHeight: 0,   // pixels above ground
+                    onGround: true,
+                    // hidden shadow blocks this player has activated
+                    hiddenShadows: new Set(),
+                    // teleport
+                    lastTelepadId: null
+                };
+                walkAnimTimers[pId] = { frame: 0, timer: 0 };
+
+                let tab = document.createElement('button');
+                tab.className = "player-tab-btn" + (i===1 ? " active" : "");
+                tab.textContent = "Player " + i;
+                tab.onclick = () => switchActiveControlledPlayer(pId);
+                switcher.appendChild(tab);
+
+                let pEl = document.createElement('div');
+                pEl.id = "char_" + pId;
+                pEl.className = "player-character";
+                pEl.style.left = playersData[pId].x + "px";
+                pEl.style.top  = playersData[pId].y + "px";
+                pEl.innerHTML = `
+                    <div class="player-label">${playersData[pId].name}</div>
+                    <div class="health-bar-container"><div id="hp_fill_${pId}" class="health-bar-fill"></div></div>
+                    <img id="char_sprite_${pId}" class="char-sprite" src="Character.png" style="image-rendering:pixelated;">
+                `;
+                // Shadow for jump
+                let shadow = document.createElement('div');
+                shadow.id = "jump_shadow_" + pId;
+                shadow.className = "jump-shadow";
+                shadow.style.width = "50px"; shadow.style.height = "12px";
+                shadow.style.display = "none";
+                document.getElementById('map-grid').appendChild(shadow);
+
+                document.getElementById('players-layer').appendChild(pEl);
+            }
+
+            activeControlledPlayerId = "player_1";
             renderInventoryHotbarHUD();
             syncHeldToolVisualsDOM();
             updateCameraToActivePlayerFocus();
-            
-            let target = playersData[pId];
-            document.getElementById('death-screen').style.display = (target.health <= 0) ? "flex" : "none";
+            document.getElementById('stamina-bar-container').style.display = "block";
+            startPlaytestPhysicsLoop();
+
+        } else {
+            isPlaytesting = false;
+            hammerCooldownTimer = 0; gunCooldownTimer = 0;
+            if (hammerCooldownInterval) clearInterval(hammerCooldownInterval);
+            document.getElementById('hammer-cooldown-indicator').style.display = "none";
+            document.getElementById('mp-switcher-bar').style.display = "none";
+            document.getElementById('hud-hotbar').innerHTML = "";
+            document.getElementById('btn-playtest').textContent = "Playtest Game";
+            document.getElementById('btn-playtest').style.borderColor = "green";
+            document.getElementById('btn-playtest').style.color = "green";
+            document.getElementById('death-screen').style.display = "none";
+            document.getElementById('stamina-bar-container').style.display = "none";
+            document.getElementById('crouch-indicator').style.display = "none";
+
+            if (physicsRafId) cancelAnimationFrame(physicsRafId);
+            document.getElementById('players-layer').innerHTML = "";
+            document.querySelectorAll('.jump-shadow').forEach(e => e.remove());
+
+            hammerBlocks.forEach(b => document.getElementById(b.id)?.remove());
+            hammerBlocks = [];
+            activeProjectilesList.forEach(p => document.getElementById(p.id)?.remove());
+            activeProjectilesList = [];
+
+            // Restore shadow blocks
+            sceneObjects.filter(o => o.type === 'shadow').forEach(o => {
+                let el = document.getElementById(o.id);
+                if (el) el.style.display = '';
+            });
+
+            camX = 50; camY = 50; currentZoomScale = 1.0;
+            updateCameraTransformDOM();
+        }
+    }
+
+    function switchActiveControlledPlayer(pId) {
+        if (!isPlaytesting) return;
+        activeControlledPlayerId = pId;
+        document.querySelectorAll('.player-tab-btn').forEach((btn, idx) => {
+            btn.classList.toggle('active', ("player_" + (idx+1)) === pId);
+        });
+        renderInventoryHotbarHUD();
+        syncHeldToolVisualsDOM();
+        updateCameraToActivePlayerFocus();
+        let t = playersData[pId];
+        document.getElementById('death-screen').style.display = (t.health <= 0) ? "flex" : "none";
+        syncShadowVisibility(pId);
+    }
+
+    // ─── ANIMATION ──────────────────────────────────────────────────────────────
+
+    function advanceWalkAnimation(pId, isMoving, dt) {
+        let pd = playersData[pId];
+        let sprite = document.getElementById('char_sprite_' + pId);
+        if (!sprite) return;
+
+        let frames = (pd.selectedTool) ? WALK_FRAMES_HOLD : WALK_FRAMES_NORMAL;
+
+        if (pd.isCrouching) {
+            sprite.src = CROUCH_FRAME;
+            walkAnimTimers[pId].frame = 0;
+            // flip
+            sprite.style.transform = pd.facingDirection === 'left' ? 'scaleX(-1)' : 'scaleX(1)';
+            return;
         }
 
-        function renderInventoryHotbarHUD() {
-            const bar = document.getElementById('hud-hotbar');
-            bar.innerHTML = "";
-            if(!isPlaytesting || !activeControlledPlayerId) return;
+        if (!isMoving) {
+            sprite.src = frames[0];
+            walkAnimTimers[pId].frame = 0;
+            sprite.style.transform = pd.facingDirection === 'left' ? 'scaleX(-1)' : 'scaleX(1)';
+            return;
+        }
 
-            let currentAct = playersData[activeControlledPlayerId];
-            currentAct.inventory.forEach(tool => {
-                let slot = document.createElement('div');
-                slot.className = "hotbar-slot" + (currentAct.selectedTool === tool ? " selected" : "");
-                slot.style.backgroundImage = `url('${tool}.png')`;
-                slot.onclick = () => {
-                    currentAct.selectedTool = tool;
+        let fps = pd.isRunning ? 10 : 6;
+        walkAnimTimers[pId].timer += dt;
+        if (walkAnimTimers[pId].timer >= 1/fps) {
+            walkAnimTimers[pId].timer = 0;
+            walkAnimTimers[pId].frame = (walkAnimTimers[pId].frame + 1) % frames.length;
+        }
+        sprite.src = frames[walkAnimTimers[pId].frame];
+        sprite.style.transform = pd.facingDirection === 'left' ? 'scaleX(-1)' : 'scaleX(1)';
+    }
+
+    // ─── HUD ────────────────────────────────────────────────────────────────────
+
+    function renderInventoryHotbarHUD() {
+        const bar = document.getElementById('hud-hotbar');
+        bar.innerHTML = "";
+        if (!isPlaytesting || !activeControlledPlayerId) return;
+        let ap = playersData[activeControlledPlayerId];
+
+        // Empty hand slot
+        let emptySlot = document.createElement('div');
+        emptySlot.className = "hotbar-slot" + (!ap.selectedTool ? " selected" : "");
+        emptySlot.title = "Empty hand";
+        emptySlot.style.fontSize = "18px";
+        emptySlot.style.display = "flex";
+        emptySlot.style.alignItems = "center";
+        emptySlot.style.justifyContent = "center";
+        emptySlot.textContent = "✋";
+        emptySlot.onclick = () => { ap.selectedTool = null; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); };
+        bar.appendChild(emptySlot);
+
+        ap.inventory.forEach(tool => {
+            let slot = document.createElement('div');
+            slot.className = "hotbar-slot" + (ap.selectedTool === tool ? " selected" : "");
+            slot.style.backgroundImage = `url('${tool}.png')`;
+            slot.onclick = () => { ap.selectedTool = tool; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); };
+            bar.appendChild(slot);
+        });
+    }
+
+    function syncHeldToolVisualsDOM() {
+        // No wield node anymore - animation handles holding via sprite
+        // Just re-render sprites
+        if (!isPlaytesting) return;
+        for (let pId in playersData) {
+            let sprite = document.getElementById('char_sprite_' + pId);
+            if (!sprite) continue;
+            let pd = playersData[pId];
+            // handled in advanceWalkAnimation
+        }
+    }
+
+    function syncStaminaBar(pId) {
+        if (pId !== activeControlledPlayerId) return;
+        let ap = playersData[pId];
+        let fill = document.getElementById('stamina-bar-fill');
+        if (fill) fill.style.width = ap.stamina + "%";
+    }
+
+    // ─── SHADOW BLOCK VISIBILITY ────────────────────────────────────────────────
+
+    function syncShadowVisibility(pId) {
+        let pd = playersData[pId];
+        if (!pd) return;
+        // Only affects the currently controlled player's viewport
+        sceneObjects.filter(o => o.type === 'shadow').forEach(o => {
+            let el = document.getElementById(o.id);
+            if (!el) return;
+            if (pId === activeControlledPlayerId) {
+                el.style.display = pd.hiddenShadows.has(o.id) ? 'none' : '';
+            }
+        });
+    }
+
+    // ─── PHYSICS LOOP ───────────────────────────────────────────────────────────
+
+    let lastPhysicsTime = 0;
+    function startPlaytestPhysicsLoop() {
+        function loop(timestamp) {
+            if (!isPlaytesting) return;
+            let dt = Math.min((timestamp - lastPhysicsTime) / 1000, 0.05);
+            lastPhysicsTime = timestamp;
+
+            physicsStep(dt);
+            physicsRafId = requestAnimationFrame(loop);
+        }
+        lastPhysicsTime = performance.now();
+        physicsRafId = requestAnimationFrame(loop);
+    }
+
+    function physicsStep(dt) {
+        const mapLimit = totalMapMeters * meterScaleFactor;
+
+        // ── Projectiles ──
+        for (let i = activeProjectilesList.length - 1; i >= 0; i--) {
+            let p = activeProjectilesList[i];
+            p.x += p.vx; p.y += p.vy;
+            let pEl = document.getElementById(p.id);
+            if (pEl) { pEl.style.left = p.x + "px"; pEl.style.top = p.y + "px"; }
+
+            let hit = false;
+            let pBox = { x: p.x, y: p.y, width: 4, height: 4 };
+
+            for (let pId in playersData) {
+                if (pId === p.ownerId) continue;
+                let t = playersData[pId];
+                if (t.health > 0 && p.x >= t.x && p.x <= t.x+75 && p.y >= t.y && p.y <= t.y+75) {
+                    damagePlayerTarget(t, 20); hit = true; break;
+                }
+            }
+            if (!hit) {
+                let obs = [...sceneObjects, ...hammerBlocks];
+                for (let j = obs.length-1; j >= 0; j--) {
+                    let o = obs[j];
+                    if (o.type === 'spawn' || o.type === 'shadow' || o.type === 'telepad') continue;
+                    if (o.visibility === 0) continue;
+                    if (checkShapeSpecificCollision(pBox, o.shape||'cube', o)) {
+                        hit = true;
+                        if (hammerBlocks.includes(o)) {
+                            document.getElementById(o.id)?.remove();
+                            hammerBlocks.splice(hammerBlocks.indexOf(o), 1);
+                        }
+                        break;
+                    }
+                }
+            }
+            if (hit || p.x < 0 || p.x > mapLimit || p.y < 0 || p.y > mapLimit) {
+                document.getElementById(p.id)?.remove();
+                activeProjectilesList.splice(i, 1);
+            }
+        }
+
+        // ── Players ──
+        let ap = playersData[activeControlledPlayerId];
+        if (!ap || ap.health <= 0) return;
+
+        // Crouch / run state
+        let wantCrouch = !!(keyLayoutState['c']);
+        let wantRun    = !!(keyLayoutState['shift']) && !wantCrouch;
+
+        ap.isCrouching = wantCrouch;
+
+        // Stamina
+        if (wantRun && (keyLayoutState['a'] || keyLayoutState['d'] || keyLayoutState['arrowleft'] || keyLayoutState['arrowright'])) {
+            ap.stamina = Math.max(0, ap.stamina - dt * 30);
+            ap.isRunning = ap.stamina > 0;
+        } else {
+            ap.isRunning = false;
+            ap.stamina = Math.min(100, ap.stamina + dt * 15);
+        }
+        syncStaminaBar(activeControlledPlayerId);
+
+        let baseSpeed = 5 * meterScaleFactor * dt;
+        let speed = ap.isCrouching ? baseSpeed * 0.4 : (ap.isRunning ? baseSpeed * 1.85 : baseSpeed);
+
+        let moving = false;
+        let nextX = ap.x, nextY = ap.y;
+
+        if (!ap.isCrouching) {
+            if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { nextY -= speed; moving = true; }
+            if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { nextY += speed; moving = true; }
+        }
+        if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { nextX -= speed; ap.facingDirection = 'left';  moving = true; }
+        if (keyLayoutState['d'] || keyLayoutState['arrowright']) { nextX += speed; ap.facingDirection = 'right'; moving = true; }
+
+        // Jump physics (visual offset only, not actual Y movement)
+        if (!ap.onGround) {
+            ap.jumpVelocity += 40 * dt; // gravity
+            ap.jumpHeight -= ap.jumpVelocity;
+            if (ap.jumpHeight <= 0) {
+                ap.jumpHeight = 0;
+                ap.jumpVelocity = 0;
+                ap.onGround = true;
+            }
+        }
+
+        // Conveyor / drag physics
+        sceneObjects.forEach(obj => {
+            let box = { x: ap.x, y: ap.y, width: 75, height: 75 };
+            if (checkShapeSpecificCollision(box, obj.shape, obj)) {
+                if (obj.dragOn) {
+                    if (obj.type === 'moving' && obj.velocityX !== undefined) {
+                        nextX += obj.velocityX; nextY += obj.velocityY;
+                        ap.x += obj.velocityX; ap.y += obj.velocityY;
+                    } else if (obj.type === 'spinning' && obj.angularVelocity) {
+                        let rad = obj.angularVelocity * Math.PI/180;
+                        let cx = obj.left + obj.width/2, cy = obj.top + obj.height/2;
+                        let rx = (ap.x+37.5)-cx, ry = (ap.y+37.5)-cy;
+                        let rotX = (rx*Math.cos(rad)-ry*Math.sin(rad))-rx;
+                        let rotY = (rx*Math.sin(rad)+ry*Math.cos(rad))-ry;
+                        nextX += rotX; nextY += rotY; ap.x += rotX; ap.y += rotY;
+                    }
+                } else if (obj.collide) {
+                    if (obj.type === 'moving' && (obj.velocityX||obj.velocityY)) {
+                        nextX += obj.velocityX; nextY += obj.velocityY;
+                        ap.x += obj.velocityX; ap.y += obj.velocityY;
+                    }
+                }
+            }
+        });
+
+        // Bounds
+        nextX = Math.max(0, Math.min(mapLimit-75, nextX));
+        nextY = Math.max(0, Math.min(mapLimit-75, nextY));
+
+        // Solid collision (axis-separated)
+        let hitH = false, hitV = false;
+        let obstacles = [...sceneObjects, ...hammerBlocks];
+        obstacles.forEach(obj => {
+            if (!obj.collide || obj.type === 'spawn') return;
+            if (obj.type === 'telepad' || obj.type === 'shadow') return;
+            if (obj.dragOn && checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, obj.shape||'cube', obj)) return;
+            if (ap.jumpHeight > 0 && obj.type === 'kill') return; // can jump over kill bricks
+
+            let shape = obj.shape || 'cube';
+            let inside = checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, shape, obj);
+            if (checkShapeSpecificCollision({x: nextX, y: ap.y, width:75, height:75}, shape, obj) && !inside) hitH = true;
+            if (checkShapeSpecificCollision({x: ap.x, y: nextY, width:75, height:75}, shape, obj) && !inside) hitV = true;
+        });
+        if (!hitH) ap.x = nextX;
+        if (!hitV) ap.y = nextY;
+
+        // Kill bricks (only if not jumping over)
+        sceneObjects.forEach(obj => {
+            if (obj.type !== 'kill') return;
+            if (ap.jumpHeight > 20) return; // jumping clears kill bricks
+            if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, obj.shape, obj)) {
+                damagePlayerTarget(ap, 100);
+            }
+        });
+
+        // Shadow blocks
+        sceneObjects.filter(o => o.type === 'shadow').forEach(obj => {
+            if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, 'cube', obj)) {
+                if (!ap.hiddenShadows.has(obj.id)) {
+                    ap.hiddenShadows.add(obj.id);
+                    if (activeControlledPlayerId === ap.id) {
+                        let el = document.getElementById(obj.id);
+                        if (el) el.style.display = 'none';
+                    }
+                }
+            }
+        });
+
+        // Teleport pads
+        if (!teleportCooldowns[ap.id]) teleportCooldowns[ap.id] = 0;
+        if (teleportCooldowns[ap.id] > 0) teleportCooldowns[ap.id] -= dt;
+
+        if (teleportCooldowns[ap.id] <= 0) {
+            sceneObjects.filter(o => o.type === 'telepad').forEach(pad => {
+                if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, 'cube', pad)) {
+                    if (ap.lastTelepadId === pad.id) return;
+                    let dest = sceneObjects.find(o => o.id === pad.telepadLink && o.type === 'telepad');
+                    if (dest) {
+                        // one-way: pad sends but dest does not send back
+                        ap.x = dest.left + dest.width/2 - 37.5;
+                        ap.y = dest.top  + dest.height/2 - 37.5;
+                        ap.lastTelepadId = dest.id; // prevent instant re-teleport on destination
+                        teleportCooldowns[ap.id] = 1.0;
+                    }
+                } else if (ap.lastTelepadId === pad.id) {
+                    ap.lastTelepadId = null;
+                }
+            });
+        }
+
+        // Tool pickups
+        droppedTools.forEach((tool, idx) => {
+            if (checkShapeSpecificCollision({x: ap.x, y: ap.y, width:75, height:75}, 'cube', {left: tool.left, top: tool.top, width:35, height:35})) {
+                if (!ap.inventory.includes(tool.type)) {
+                    ap.inventory.push(tool.type);
+                    if (!ap.selectedTool) ap.selectedTool = tool.type;
                     renderInventoryHotbarHUD();
                     syncHeldToolVisualsDOM();
-                };
-                bar.appendChild(slot);
-            });
-        }
-
-        function syncHeldToolVisualsDOM() {
-            if(!isPlaytesting) return;
-            for(let pId in playersData) {
-                let pData = playersData[pId];
-                let node = document.getElementById(`wield_node_${pId}`);
-                if(!node) continue;
-
-                if(pData.health > 0 && pData.selectedTool) {
-                    node.style.display = "block";
-                    node.style.backgroundImage = `url('${pData.selectedTool}.png')`;
-                    
-                    if(pData.facingDirection === 'left') {
-                        node.className = "tool-overlay-node pos-left";
-                        node.style.transform = "scaleX(-1) rotate(35deg)";
-                    } else {
-                        node.className = "tool-overlay-node pos-right";
-                        node.style.transform = "rotate(35deg)";
-                    }
-                } else {
-                    node.style.display = "none";
                 }
+                document.getElementById(tool.id)?.remove();
+                droppedTools.splice(idx, 1);
             }
+        });
+
+        // Update character element position
+        let el = document.getElementById("char_" + ap.id);
+        if (el) {
+            el.style.left = ap.x + "px";
+            el.style.top  = (ap.y - ap.jumpHeight) + "px";
         }
 
-        function triggerHeldToolSlashEffect() {
-            let attacker = playersData[activeControlledPlayerId];
-            if(!attacker || attacker.health <= 0 || !attacker.selectedTool) return;
-
-            let node = document.getElementById(`wield_node_${attacker.id}`);
-            if(node) {
-                if(attacker.selectedTool === 'gun') {
-                    let recoilTrans = (attacker.facingDirection === 'left') ? "scaleX(-1) translate(6px, 4px) rotate(15deg)" : "translate(-6px, 4px) rotate(15deg)";
-                    let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
-                    
-                    node.style.transform = recoilTrans;
-                    setTimeout(() => { 
-                        if(attacker.selectedTool === 'gun') node.style.transform = baseAngle; 
-                    }, 80);
-                    return;
-                }
-
-                let targetAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(105deg)" : "rotate(105deg)";
-                let baseAngle = (attacker.facingDirection === 'left') ? "scaleX(-1) rotate(35deg)" : "rotate(35deg)";
-                
-                node.style.transform = targetAngle;
-                setTimeout(() => { 
-                    if(attacker.selectedTool) node.style.transform = baseAngle; 
-                }, 150);
-            }
-        }
-
-        function checkShapeSpecificCollision(playerBox, shape, obj) {
-            let angleDeg = obj.rotation || 0;
-            let objCenterX = obj.left + obj.width / 2;
-            let objCenterY = obj.top + obj.height / 2;
-            let playerCenterX = playerBox.x + playerBox.width / 2;
-            let playerCenterY = playerBox.y + playerBox.height / 2;
-
-            let localPlayerX = playerCenterX;
-            let localPlayerY = playerCenterY;
-
-            if (angleDeg !== 0) {
-                let rad = -angleDeg * Math.PI / 180;
-                let cos = Math.cos(rad);
-                let sin = Math.sin(rad);
-                let dx = playerCenterX - objCenterX;
-                let dy = playerCenterY - objCenterY;
-                localPlayerX = objCenterX + (dx * cos - dy * sin);
-                localPlayerY = objCenterY + (dx * sin + dy * cos);
-            }
-
-            let pLeft = localPlayerX - playerBox.width / 2;
-            let pRight = localPlayerX + playerBox.width / 2;
-            let pTop = localPlayerY - playerBox.height / 2;
-            let pBottom = localPlayerY + playerBox.height / 2;
-
-            if (pRight < obj.left || pLeft > obj.left + obj.width || pBottom < obj.top || pTop > obj.top + obj.height) {
-                return false; 
-            }
-            if (shape === 'cube' || shape === 'sign') return true; 
-
-            if (shape === 'circle') {
-                let cx = obj.left + obj.width / 2;
-                let cy = obj.top + obj.height / 2;
-                let rx = obj.width / 2;
-                let ry = obj.height / 2;
-                let closestX = Math.max(pLeft, Math.min(cx, pRight));
-                let closestY = Math.max(pTop, Math.min(cy, pBottom));
-                let distX = (closestX - cx) / rx;
-                let distY = (closestY - cy) / ry;
-                return (distX * distX + distY * distY) <= 1;
-            }
-
-            if (shape === 'wedge') {
-                let localX = ((pLeft + pRight) / 2) - obj.left;
-                let localY = ((pTop + pBottom) / 2) - obj.top;
-                return ((localX / obj.width) + (localY / obj.height) >= 1.0);
-            }
-
-            if (shape === 'octagon' || shape === 'halfcircle' || shape === 'arch') {
-                let cx = obj.left + obj.width / 2;
-                let cy = obj.top + obj.height / 2;
-                let dx = Math.abs(((pLeft + pRight) / 2) - cx) / (obj.width / 2);
-                let dy = Math.abs(((pTop + pBottom) / 2) - cy) / (obj.height / 2);
-                return (dx + dy <= 1.45) && (dx <= 1.0 && dy <= 1.0);
-            }
-            return true;
-        }
-
-        function fireRangedGunBullet(targetX, targetY) {
-            let shooter = playersData[activeControlledPlayerId];
-            if(!shooter || shooter.health <= 0) return;
-            
-            if (gunCooldownTimer > 0) return;
-
-            triggerHeldToolSlashEffect();
-            gunCooldownTimer = 0.5;
-
-            objectIdCounter++;
-            let bId = "bullet_" + objectIdCounter;
-
-            let startX = shooter.x + (shooter.facingDirection === 'left' ? 10 : 65);
-            let startY = shooter.y + 42; 
-
-            let angle = Math.atan2(targetY - startY, targetX - startX);
-            let speed = 12;
-
-            let proj = {
-                id: bId,
-                x: startX,
-                y: startY,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                ownerId: shooter.id
-            };
-
-            activeProjectilesList.push(proj);
-
-            let el = document.createElement('div');
-            el.id = bId;
-            el.className = "bullet-projectile";
-            el.style.left = proj.x + "px";
-            el.style.top = proj.y + "px";
-            document.getElementById('projectiles-layer').appendChild(el);
-        }
-
-        function runPlaytestPhysicsLoop() {
-            playtestPhysicsLoop = setInterval(() => {
-                let speed = 5 * meterScaleFactor * 0.016;
-                let activeUser = playersData[activeControlledPlayerId];
-
-                /* ADVANCE RANGED PROJECTILES & COLLISION DETECTION */
-                for(let i = activeProjectilesList.length - 1; i >= 0; i--) {
-                    let p = activeProjectilesList[i];
-                    p.x += p.vx;
-                    p.y += p.vy;
-
-                    let pEl = document.getElementById(p.id);
-                    if(pEl) {
-                        pEl.style.left = p.x + "px";
-                        pEl.style.top = p.y + "px";
-                    }
-
-                    let hitTarget = false;
-                    let pBox = { x: p.x, y: p.y, width: 6, height: 6 };
-
-                    for(let pId in playersData) {
-                        if(pId === p.ownerId) continue;
-                        let targetPlayer = playersData[pId];
-                        if(targetPlayer.health > 0) {
-                            if(p.x >= targetPlayer.x && p.x <= targetPlayer.x + 75 && p.y >= targetPlayer.y && p.y <= targetPlayer.y + 75) {
-                                damagePlayerTarget(targetPlayer, 20);
-                                hitTarget = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if(!hitTarget) {
-                        let obstacles = [...sceneObjects, ...hammerBlocks];
-                        for(let j = obstacles.length - 1; j >= 0; j--) {
-                            let obj = obstacles[j];
-                            if(obj.type === 'spawn') continue;
-                            if(checkShapeSpecificCollision(pBox, obj.shape || 'cube', obj)) {
-                                hitTarget = true;
-                                if(hammerBlocks.includes(obj)) {
-                                    document.getElementById(obj.id)?.remove();
-                                    hammerBlocks.splice(hammerBlocks.indexOf(obj), 1);
-                                }
-                                break;
-                            }
-                        }
-                    }
-
-                    let limit = totalMapMeters * meterScaleFactor;
-                    if(hitTarget || p.x < 0 || p.x > limit || p.y < 0 || p.y > limit) {
-                        document.getElementById(p.id)?.remove();
-                        activeProjectilesList.splice(i, 1);
-                    }
-                }
-
-                if(activeUser && activeUser.health > 0) {
-                    let nextX = activeUser.x;
-                    let nextY = activeUser.y;
-
-                    let horizontalInput = false;
-
-                    if(keyLayoutState['w'] || keyLayoutState['arrowup']) nextY -= speed;
-                    if(keyLayoutState['s'] || keyLayoutState['arrowdown']) nextY += speed;
-                    
-                    if(keyLayoutState['a'] || keyLayoutState['arrowleft']) { 
-                        nextX -= speed; 
-                        activeUser.facingDirection = 'left';
-                        horizontalInput = true;
-                    }
-                    if(keyLayoutState['d'] || keyLayoutState['arrowright']) { 
-                        nextX += speed; 
-                        activeUser.facingDirection = 'right';
-                        horizontalInput = true;
-                    }
-
-                    if (horizontalInput) {
-                        syncHeldToolVisualsDOM();
-                    }
-
-                    sceneObjects.forEach(obj => {
-                        let currentBox = { x: activeUser.x, y: activeUser.y, width: 75, height: 75 };
-                        
-                        if(checkShapeSpecificCollision(currentBox, obj.shape, obj)) {
-                            if (obj.dragOn) {
-                                if(obj.type === 'moving' && obj.velocityX !== undefined && obj.velocityY !== undefined) {
-                                    nextX += obj.velocityX;
-                                    nextY += obj.velocityY;
-                                    activeUser.x += obj.velocityX;
-                                    activeUser.y += obj.velocityY;
-                                } else if(obj.type === 'spinning' && obj.angularVelocity) {
-                                    let rad = obj.angularVelocity * Math.PI / 180;
-                                    let cx = obj.left + obj.width/2;
-                                    let cy = obj.top + obj.height/2;
-                                    let rx = (activeUser.x + 37.5) - cx;
-                                    let ry = (activeUser.y + 37.5) - cy;
-                                    let rotX = (rx * Math.cos(rad) - ry * Math.sin(rad)) - rx;
-                                    let rotY = (rx * Math.sin(rad) + ry * Math.cos(rad)) - ry;
-                                    nextX += rotX;
-                                    nextY += rotY;
-                                    activeUser.x += rotX;
-                                    activeUser.y += rotY;
-                                }
-                            } else if (obj.collide) {
-                                if(obj.type === 'moving' && (obj.velocityX || obj.velocityY)) {
-                                    nextX += obj.velocityX;
-                                    nextY += obj.velocityY;
-                                    activeUser.x += obj.velocityX;
-                                    activeUser.y += obj.velocityY;
-                                }
-                            }
-                        }
-                    });
-
-                    let limit = totalMapMeters * meterScaleFactor;
-                    if(nextX < 0) nextX = 0; if(nextY < 0) nextY = 0;
-                    if(nextX > limit - 75) nextX = limit - 75; if(nextY > limit - 75) nextY = limit - 75;
-
-                    let hitH = false, hitV = false;
-                    let obstacles = [...sceneObjects, ...hammerBlocks];
-                    
-                    obstacles.forEach(obj => {
-                        if(!obj.collide || obj.type === 'spawn') return;
-                        if(obj.dragOn && checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 75, height: 75}, obj.shape || 'cube', obj)) {
-                            return;
-                        }
-
-                        let shapeType = obj.shape || 'cube';
-                        let currentlyInside = checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 75, height: 75}, shapeType, obj);
-                        
-                        if(checkShapeSpecificCollision({x: nextX, y: activeUser.y, width: 75, height: 75}, shapeType, obj)) {
-                            if(!currentlyInside) hitH = true; 
-                        }
-                        if(checkShapeSpecificCollision({x: activeUser.x, y: nextY, width: 75, height: 75}, shapeType, obj)) {
-                            if(!currentlyInside) hitV = true; 
-                        }
-                    });
-
-                    if(!hitH) activeUser.x = nextX;
-                    if(!hitV) activeUser.y = nextY;
-
-                    let el = document.getElementById("char_" + activeControlledPlayerId);
-                    if(el) { el.style.left = activeUser.x + "px"; el.style.top = activeUser.y + "px"; }
-
-                    sceneObjects.forEach(obj => {
-                        if(obj.type === 'kill') {
-                            let updatedBox = { x: activeUser.x, y: activeUser.y, width: 75, height: 75 };
-                            if(checkShapeSpecificCollision(updatedBox, obj.shape, obj)) {
-                                damagePlayerTarget(activeUser, 100);
-                            }
-                        }
-                    });
-
-                    if (activeUser.health > 0) {
-                        droppedTools.forEach((tool, index) => {
-                            if(checkShapeSpecificCollision({x: activeUser.x, y: activeUser.y, width: 75, height: 75}, 'cube', {left: tool.left, top: tool.top, width: 35, height: 35})) {
-                                if(!activeUser.inventory.includes(tool.type)) {
-                                    activeUser.inventory.push(tool.type);
-                                    if(!activeUser.selectedTool) activeUser.selectedTool = tool.type;
-                                    renderInventoryHotbarHUD();
-                                    syncHeldToolVisualsDOM();
-                                }
-                                document.getElementById(tool.id)?.remove();
-                                droppedTools.splice(index, 1);
-                            }
-                        });
-                    }
-
-                    updateCameraToActivePlayerFocus();
-                }
-            }, 16);
-        }
-
-        function damagePlayerTarget(target, amount) {
-            target.health = Math.max(0, target.health - amount);
-            let fill = document.getElementById(`hp_fill_${target.id}`);
-            if(fill) fill.style.width = target.health + "%";
-            if(target.health <= 0 && target.id === activeControlledPlayerId) {
-                document.getElementById('death-screen').style.display = "flex";
-                syncHeldToolVisualsDOM();
-            }
-        }
-
-        function triggerActivePlayerAttack() {
-            let attacker = playersData[activeControlledPlayerId];
-            if(!attacker || attacker.health <= 0) return;
-
-            if(attacker.selectedTool === 'gun') {
-                let trackingEl = document.getElementById("char_" + attacker.id);
-                if(trackingEl) {
-                    let aimX = attacker.x + (attacker.facingDirection === 'left' ? -200 : 275);
-                    let aimY = attacker.y + 42;
-                    fireRangedGunBullet(aimX, aimY);
-                }
-                return;
-            }
-
-            if(attacker.selectedTool !== 'sword') return;
-            triggerHeldToolSlashEffect();
-
-            for(let pId in playersData) {
-                if(pId === attacker.id) continue;
-                let target = playersData[pId];
-                if(target.health <= 0) continue;
-                if(Math.sqrt((attacker.x - target.x)**2 + (attacker.y - target.y)**2) <= 110) damagePlayerTarget(target, 25);
-            }
-
-            hammerBlocks.forEach((block, index) => {
-                if(Math.sqrt((attacker.x - block.left)**2 + (attacker.y - block.top)**2) <= 120) {
-                    document.getElementById(block.id)?.remove();
-                    hammerBlocks.splice(index, 1);
-                }
-            });
-        }
-
-        function buildHammerBlockAtClickLocation(targetX, targetY) {
-            objectIdCounter++;
-            let bId = "hammer_block_" + objectIdCounter;
-            
-            let hBlock = { left: targetX - 20, top: targetY - 20, width: 40, height: 40, collide: true, id: bId };
-            hammerBlocks.push(hBlock);
-
-            let colors = ['#ff0055', '#00ffaa', '#ffaa00', '#00aaff', '#cc00ff', '#ffff00'];
-            let randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-            let el = document.createElement('div');
-            el.id = bId; el.className = 'editor-obj shape-cube';
-            el.style.left = hBlock.left + "px"; el.style.top = hBlock.top + "px";
-            el.style.width = hBlock.width + "px"; el.style.height = hBlock.height + "px";
-            el.style.backgroundColor = randomColor;
-            
-            document.getElementById('map-grid').appendChild(el);
-            setTimeout(() => {
-                document.getElementById(bId)?.remove();
-                hammerBlocks = hammerBlocks.filter(b => b.id !== bId);
-            }, 10000);
-        }
-
-        function respawnActiveCharacter() {
-            let spawnObj = sceneObjects.find(o => o.type === 'spawn');
-            let target = playersData[activeControlledPlayerId];
-            if(!target || !spawnObj) return;
-
-            document.getElementById('death-screen').style.display = "none";
-            target.health = 100;
-            target.x = spawnObj.left + (spawnObj.width / 2) - 37.5;
-            target.y = spawnObj.top + (spawnObj.height / 2) - 37.5;
-            target.facingDirection = 'right';
-
-            let fill = document.getElementById(`hp_fill_${target.id}`);
-            if(fill) fill.style.width = "100%";
-            syncHeldToolVisualsDOM();
-        }
-
-        function spawnMapElement(primitiveType, shapeGeometry) {
-            objectIdCounter++;
-            let newObj = {
-                id: "obj_" + objectIdCounter,
-                type: primitiveType,
-                shape: shapeGeometry,
-                left: 100, top: 100, width: 120, height: 60, rotation: 0,
-                material: 'plastic', color: '#e6c280', text: 'Sign Post',
-                collide: primitiveType !== 'kill' && primitiveType !== 'spawn',
-                speed: primitiveType === 'spinning' ? 3 : 4,
-                dragOn: true,
-                nodeA: { x: 100, y: 100 }, nodeB: { x: 300, y: 100 }, targetNode: 'B'
-            };
-
-            sceneObjects.push(newObj);
-            renderObjectElementDOM(newObj);
-            selectObjectTarget(newObj);
-        }
-
-        function renderObjectElementDOM(obj) {
-            const el = document.createElement('div');
-            el.id = obj.id;
-            el.className = `editor-obj shape-${obj.shape}`;
-
-            el.addEventListener('mousedown', (e) => {
-                // Allows click event to safely trickle down to general weapon logic during playtest
-                if(isPlaytesting) return;
-                e.stopPropagation();
-                selectObjectTarget(obj);
-                if(activeToolState === 'move') initiateTransformDrag(e, null);
-            });
-            document.getElementById('map-grid').appendChild(el);
-            updateObjectElementPositionDOM(obj);
-        }
-
-        function updateObjectElementPositionDOM(obj) {
-            const el = document.getElementById(obj.id);
-            if(!el) return;
-            
-            el.className = `editor-obj shape-${obj.shape} mat-${obj.material}`;
-            if(obj.type === 'kill') el.classList.add('obj-kill');
-            if(obj.type === 'spawn') el.classList.add('obj-spawn');
-            if(obj.type === 'spinning') el.classList.add('obj-spinning');
-            if(selectedObjectTarget && selectedObjectTarget.id === obj.id) el.classList.add('selected');
-
-            el.style.left = obj.left + "px"; el.style.top = obj.top + "px";
-            el.style.width = obj.width + "px"; el.style.height = obj.height + "px";
-            el.style.transform = `rotate(${obj.rotation}deg)`;
-            
-            if(obj.shape === 'octagon') {
-                el.innerHTML = `
-                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block; pointer-events:none;">
-                        <polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="${obj.color}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
-                    </svg>
-                `;
-            } else if(obj.shape === 'wedge') {
-                el.innerHTML = `
-                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block; pointer-events:none;">
-                        <polygon points="0,100 100,0 100,100" fill="${obj.color}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
-                    </svg>
-                `;
-            } else if(obj.shape === 'sign') {
-                let approxFontSize = Math.max(10, Math.min(obj.height * 0.35, obj.width * 0.15));
-                el.innerHTML = `<span style="font-size: ${approxFontSize}px;"></span>`;
-                el.querySelector('span').textContent = obj.text || '';
-                el.style.backgroundColor = (obj.material === 'plastic') ? obj.color : "transparent";
+        // Jump shadow
+        let jShadow = document.getElementById("jump_shadow_" + ap.id);
+        if (jShadow) {
+            if (ap.jumpHeight > 0) {
+                jShadow.style.display = "block";
+                let scale = Math.max(0.4, 1 - ap.jumpHeight/120);
+                jShadow.style.width   = (50 * scale) + "px";
+                jShadow.style.height  = (12 * scale) + "px";
+                jShadow.style.left    = (ap.x + 12.5 + (25 - 25*scale)) + "px";
+                jShadow.style.top     = (ap.y + 65) + "px";
+                jShadow.style.opacity = (0.5 * scale);
             } else {
-                el.innerHTML = '';
-                el.style.backgroundColor = (obj.material === 'plastic') ? obj.color : "transparent";
+                jShadow.style.display = "none";
             }
         }
 
-        function selectObjectTarget(obj) {
+        // Walk animation
+        advanceWalkAnimation(ap.id, moving, dt);
+
+        // Crouch indicator
+        document.getElementById('crouch-indicator').style.display = ap.isCrouching ? "block" : "none";
+
+        updateCameraToActivePlayerFocus();
+    }
+
+    // ─── COMBAT ─────────────────────────────────────────────────────────────────
+
+    function damagePlayerTarget(target, amount) {
+        target.health = Math.max(0, target.health - amount);
+        let fill = document.getElementById(`hp_fill_${target.id}`);
+        if (fill) fill.style.width = target.health + "%";
+        if (target.health <= 0 && target.id === activeControlledPlayerId) {
+            document.getElementById('death-screen').style.display = "flex";
+        }
+    }
+
+    function triggerActivePlayerAttack() {
+        let ap = playersData[activeControlledPlayerId];
+        if (!ap || ap.health <= 0) return;
+        if (ap.selectedTool === 'gun') {
+            let aimX = ap.x + (ap.facingDirection === 'left' ? -200 : 275);
+            let aimY = ap.y + 42;
+            fireRangedGunBullet(aimX, aimY);
+            return;
+        }
+        if (ap.selectedTool !== 'sword') return;
+        triggerHeldToolSlashEffect();
+        for (let pId in playersData) {
+            if (pId === ap.id) continue;
+            let t = playersData[pId];
+            if (t.health <= 0) continue;
+            if (Math.sqrt((ap.x-t.x)**2+(ap.y-t.y)**2) <= 110) damagePlayerTarget(t, 25);
+        }
+        hammerBlocks.forEach((block, idx) => {
+            if (Math.sqrt((ap.x-block.left)**2+(ap.y-block.top)**2) <= 120) {
+                document.getElementById(block.id)?.remove();
+                hammerBlocks.splice(idx, 1);
+            }
+        });
+    }
+
+    function triggerHeldToolSlashEffect() {
+        // purely cosmetic - animation now handled by sprite system
+    }
+
+    function fireRangedGunBullet(targetX, targetY) {
+        let shooter = playersData[activeControlledPlayerId];
+        if (!shooter || shooter.health <= 0 || gunCooldownTimer > 0) return;
+        gunCooldownTimer = 0.5;
+        objectIdCounter++;
+        let bId = "bullet_" + objectIdCounter;
+        let startX = shooter.x + (shooter.facingDirection === 'left' ? 10 : 65);
+        let startY = shooter.y + 42 - shooter.jumpHeight;
+        let angle = Math.atan2(targetY - startY, targetX - startX);
+        let speed = 12;
+        let proj = { id: bId, x: startX, y: startY, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, ownerId: shooter.id };
+        activeProjectilesList.push(proj);
+        let el = document.createElement('div');
+        el.id = bId; el.className = "bullet-projectile";
+        el.style.left = proj.x + "px"; el.style.top = proj.y + "px";
+        document.getElementById('projectiles-layer').appendChild(el);
+    }
+
+    function buildHammerBlockAtClickLocation(x, y) {
+        objectIdCounter++;
+        let bId = "hammer_block_" + objectIdCounter;
+        let hb = { left: x-20, top: y-20, width: 40, height: 40, collide: true, id: bId, shape: 'cube' };
+        hammerBlocks.push(hb);
+        let colors = ['#ff0055','#00ffaa','#ffaa00','#00aaff','#cc00ff','#ffff00'];
+        let el = document.createElement('div');
+        el.id = bId; el.className = 'editor-obj shape-cube';
+        el.style.left = hb.left + "px"; el.style.top = hb.top + "px";
+        el.style.width = hb.width + "px"; el.style.height = hb.height + "px";
+        el.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+        document.getElementById('map-grid').appendChild(el);
+        setTimeout(() => { document.getElementById(bId)?.remove(); hammerBlocks = hammerBlocks.filter(b => b.id !== bId); }, 10000);
+    }
+
+    function respawnActiveCharacter() {
+        let spawn = sceneObjects.find(o => o.type === 'spawn');
+        let ap = playersData[activeControlledPlayerId];
+        if (!ap || !spawn) return;
+        document.getElementById('death-screen').style.display = "none";
+        ap.health = 100; ap.jumpHeight = 0; ap.jumpVelocity = 0; ap.onGround = true;
+        ap.x = spawn.left + spawn.width/2 - 37.5;
+        ap.y = spawn.top  + spawn.height/2 - 37.5;
+        ap.facingDirection = 'right';
+        ap.hiddenShadows.clear();
+        syncShadowVisibility(ap.id);
+        let fill = document.getElementById(`hp_fill_${ap.id}`);
+        if (fill) fill.style.width = "100%";
+    }
+
+    // ─── COLLISION ──────────────────────────────────────────────────────────────
+
+    function checkShapeSpecificCollision(playerBox, shape, obj) {
+        let angleDeg = obj.rotation || 0;
+        let objCX = obj.left + obj.width/2;
+        let objCY = obj.top  + obj.height/2;
+        let pCX = playerBox.x + playerBox.width/2;
+        let pCY = playerBox.y + playerBox.height/2;
+        let lPX = pCX, lPY = pCY;
+        if (angleDeg !== 0) {
+            let rad = -angleDeg * Math.PI/180;
+            let cos = Math.cos(rad), sin = Math.sin(rad);
+            let dx = pCX - objCX, dy = pCY - objCY;
+            lPX = objCX + (dx*cos - dy*sin);
+            lPY = objCY + (dx*sin + dy*cos);
+        }
+        let pL = lPX - playerBox.width/2, pR = lPX + playerBox.width/2;
+        let pT = lPY - playerBox.height/2, pB = lPY + playerBox.height/2;
+        if (pR < obj.left || pL > obj.left+obj.width || pB < obj.top || pT > obj.top+obj.height) return false;
+        if (shape === 'cube' || shape === 'sign') return true;
+        if (shape === 'circle') {
+            let cx = obj.left+obj.width/2, cy = obj.top+obj.height/2;
+            let rx = obj.width/2, ry = obj.height/2;
+            let clX = Math.max(pL, Math.min(cx, pR));
+            let clY = Math.max(pT, Math.min(cy, pB));
+            return ((clX-cx)/rx)**2 + ((clY-cy)/ry)**2 <= 1;
+        }
+        if (shape === 'wedge') {
+            let lx = ((pL+pR)/2) - obj.left;
+            let ly = ((pT+pB)/2) - obj.top;
+            return (lx/obj.width + ly/obj.height) >= 1.0;
+        }
+        if (shape === 'octagon' || shape === 'halfcircle' || shape === 'arch') {
+            let cx = obj.left+obj.width/2, cy = obj.top+obj.height/2;
+            let dx2 = Math.abs(((pL+pR)/2)-cx)/(obj.width/2);
+            let dy2 = Math.abs(((pT+pB)/2)-cy)/(obj.height/2);
+            return (dx2+dy2 <= 1.45) && (dx2 <= 1 && dy2 <= 1);
+        }
+        return true;
+    }
+
+    // ─── MOVING BLOCK PATH ──────────────────────────────────────────────────────
+
+    function advanceLinearNodeTrack(obj, dt) {
+        let target = (obj.targetNode === 'A') ? obj.nodeA : obj.nodeB;
+        let dx = target.x - obj.left, dy = target.y - obj.top;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let frameAmt = (obj.speed || 4) * meterScaleFactor * dt;
+        if (dist <= frameAmt) { obj.left = target.x; obj.top = target.y; obj.targetNode = obj.targetNode === 'B' ? 'A' : 'B'; }
+        else { obj.left += (dx/dist)*frameAmt; obj.top += (dy/dist)*frameAmt; }
+    }
+
+    // ─── SAVE / LOAD / PUBLISH ──────────────────────────────────────────────────
+
+    function generateSaveString() {
+        let pkg = { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack };
+        prompt("Copy code output:", JSON.stringify(pkg));
+    }
+
+    function executeProjectPublishPipeline() {
+        let title = document.getElementById('pub-title').value.trim();
+        let desc  = document.getElementById('pub-desc').value.trim();
+        let user  = document.getElementById('pub-user').value.trim();
+        let pass  = document.getElementById('pub-pass').value;
+        if (!title || !desc || !user || !pass) return alert("Please fill out all publishing fields.");
+        if (!RegisteredUserAccountsDatabase.hasOwnProperty(user) || RegisteredUserAccountsDatabase[user] !== pass) return alert("Publishing Refused: Verification failed.");
+        let payload = { meta: { title, desc, author: user }, data: { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack } };
+        prompt("Verified! Package generated. Copy this project string:", JSON.stringify(payload));
+        document.getElementById('pub-pass').value = "";
+        document.getElementById('publish-overlay').style.display = 'none';
+    }
+
+    function loadFromString() {
+        let str = document.getElementById('load-string-input').value.trim();
+        if (!str) return alert("Input empty.");
+        try {
+            let parsed = JSON.parse(str);
+            sceneObjects.forEach(o => document.getElementById(o.id)?.remove());
+            droppedTools.forEach(t => document.getElementById(t.id)?.remove());
+            totalMapMeters  = parsed.mapSize || 40;
+            sceneObjects    = parsed.objects  || (parsed.data ? parsed.data.objects  : []);
+            droppedTools    = parsed.tools    || (parsed.data ? parsed.data.tools    : []);
+            defaultStarterPack = parsed.starters || (parsed.data ? parsed.data.starters : []);
+            initializeStudioWorkspace();
+            sceneObjects.forEach(o => renderObjectElementDOM(o));
+            droppedTools.forEach(t => {
+                let el = document.createElement('div');
+                el.id = t.id; el.className = 'dropped-tool';
+                el.style.backgroundImage = `url('${t.type}.png')`;
+                el.style.left = t.left + "px"; el.style.top = t.top + "px";
+                el.addEventListener('mousedown', (e) => { e.stopPropagation(); if (isPlaytesting) return; selectToolNodeTarget(t, el); });
+                document.getElementById('map-grid').appendChild(el);
+            });
             clearSelectionStates();
-            selectedObjectTarget = obj;
-            
-            const el = document.getElementById(obj.id);
-            if(el) el.classList.add('selected');
-
-            document.getElementById('properties-empty-notice').style.display = "none";
-            document.getElementById('properties-editor-form').style.display = "block";
-            
-            document.getElementById('prop-id').value = obj.id;
-            document.getElementById('prop-material').value = obj.material;
-            document.getElementById('prop-color').value = obj.color;
-            document.getElementById('prop-rotation').value = obj.rotation;
-            document.getElementById('prop-collide').value = obj.collide.toString();
-            document.getElementById('prop-speed').value = obj.speed || 4;
-            document.getElementById('prop-drag-on').checked = obj.dragOn !== false;
-
-            document.getElementById('prop-field-color').style.display = "block";
-            document.getElementById('prop-field-rotation').style.display = "block";
-            document.getElementById('prop-field-speed').style.display = (obj.type === 'moving' || obj.type === 'spinning') ? "block" : "none";
-            document.getElementById('prop-field-drag').style.display = (obj.type === 'moving' || obj.type === 'spinning') ? "flex" : "none";
-            
-            if(obj.shape === 'sign') {
-                document.getElementById('prop-field-text').style.display = "block";
-                document.getElementById('prop-text').value = obj.text || '';
-            } else {
-                document.getElementById('prop-field-text').style.display = "none";
-            }
-
-            if(!isPlaytesting) {
-                if(activeToolState === 'scale') appendScaleHandlesDOM(el);
-                if(activeToolState === 'rotate') appendRotateHandleDOM(el);
-                if(obj.type === 'moving') renderWaypointsOverlayDOM(obj);
-            }
-        }
-
-        function appendScaleHandlesDOM(parentEl) {
-            ['t', 'b', 'l', 'r'].forEach(dir => {
-                const handle = document.createElement('div');
-                handle.className = `scale-handle handle-${dir}`;
-                handle.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateTransformDrag(e, dir); });
-                parentEl.appendChild(handle);
-            });
-        }
-
-        function appendRotateHandleDOM(parentEl) {
-            const line = document.createElement('div'); line.className = 'rotate-line';
-            const handle = document.createElement('div'); handle.className = 'rotate-handle';
-            handle.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateMouseRotation(e); });
-            parentEl.appendChild(line); parentEl.appendChild(handle);
-        }
-
-        function renderWaypointsOverlayDOM(obj) {
-            let canvas = document.getElementById('path-visualizer-canvas');
-            let layer = document.getElementById('path-nodes-layer');
-            if(!canvas || !layer) return;
-
-            let cX1 = obj.nodeA.x + obj.width/2;
-            let cY1 = obj.nodeA.y + obj.height/2;
-            let cX2 = obj.nodeB.x + obj.width/2;
-            let cY2 = obj.nodeB.y + obj.height/2;
-
-            canvas.innerHTML = `
-                <line x1="${cX1}" y1="${cY1}" x2="${cX2}" y2="${cY2}" stroke="black" stroke-width="3" stroke-dasharray="6,6" />
-            `;
-
-            if(layer.children.length === 0) {
-                let dotA = document.createElement('div');
-                dotA.className = "visual-node-dot node-dot-a";
-                dotA.title = "Waypoint A";
-                dotA.addEventListener('mousedown', (e) => initiateWaypointNodeDrag(e, obj, 'nodeA'));
-
-                let dotB = document.createElement('div');
-                dotB.className = "visual-node-dot node-dot-b";
-                dotB.title = "Waypoint B";
-                dotB.addEventListener('mousedown', (e) => initiateWaypointNodeDrag(e, obj, 'nodeB'));
-
-                layer.appendChild(dotA);
-                layer.appendChild(dotB);
-            }
-
-            layer.children[0].style.left = cX1 + "px";
-            layer.children[0].style.top = cY1 + "px";
-            layer.children[1].style.left = cX2 + "px";
-            layer.children[1].style.top = cY2 + "px";
-        }
-
-        function initiateWaypointNodeDrag(e, obj, nodeKey) {
-            e.stopPropagation();
-            let startMyaX = e.clientX;
-            let startMyaY = e.clientY;
-            let baseNodeX = obj[nodeKey].x;
-            let baseNodeY = obj[nodeKey].y;
-
-            let dragNodeMove = (ev) => {
-                let dx = (ev.clientX - startMyaX) / currentZoomScale;
-                let dy = (ev.clientY - startMyaY) / currentZoomScale;
-                obj[nodeKey].x = baseNodeX + dx;
-                obj[nodeKey].y = baseNodeY + dy;
-                renderWaypointsOverlayDOM(obj);
-            };
-
-            let dragNodeStop = () => {
-                document.removeEventListener('mousemove', dragNodeMove);
-                document.removeEventListener('mouseup', dragNodeStop);
-            };
-
-            document.addEventListener('mousemove', dragNodeMove);
-            document.addEventListener('mouseup', dragNodeStop);
-        }
-
-        function initiateMouseRotation(e) {
-            if(!selectedObjectTarget) return;
-            isRotatingObj = true;
-            const el = document.getElementById(selectedObjectTarget.id);
-            const rect = el.getBoundingClientRect();
-            centerPointX = rect.left + rect.width / 2; centerPointY = rect.top + rect.height / 2;
-            startAngle = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX) * (180 / Math.PI);
-            baseRotation = selectedObjectTarget.rotation;
-            
-            let moveRot = (ev) => {
-                if(!isRotatingObj) return;
-                let currentAngle = Math.atan2(ev.clientY - centerPointY, ev.clientX - centerPointX) * (180 / Math.PI);
-                selectedObjectTarget.rotation = Math.round((baseRotation + (currentAngle - startAngle)) % 360);
-                if(selectedObjectTarget.rotation < 0) selectedObjectTarget.rotation += 360;
-                document.getElementById('prop-rotation').value = selectedObjectTarget.rotation;
-                updateObjectElementPositionDOM(selectedObjectTarget);
-            };
-            let stopRot = () => { isRotatingObj = false; document.removeEventListener('mousemove', moveRot); };
-            document.addEventListener('mousemove', moveRot);
-            document.addEventListener('mouseup', stopRot);
-        }
-
-        function clearSelectionStates() {
-            selectedObjectTarget = null;
-            if(selectedToolNodeTarget) {
-                selectedToolNodeTarget.element.classList.remove('selected');
-                selectedToolNodeTarget = null;
-            }
-            document.querySelectorAll('.editor-obj, .dropped-tool').forEach(el => {
-                el.classList.remove('selected');
-                el.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
-            });
-            document.getElementById('path-visualizer-canvas').innerHTML = "";
-            document.getElementById('path-nodes-layer').innerHTML = "";
-
-            document.getElementById('properties-editor-form').style.display = "none";
-            document.getElementById('properties-empty-notice').style.display = "block";
-            document.getElementById('prop-field-tool-options').style.display = "none";
-            document.getElementById('prop-field-text').style.display = "none";
-            document.getElementById('prop-field-material').style.display = "block";
-            document.getElementById('prop-field-color').style.display = "block";
-            document.getElementById('prop-field-rotation').style.display = "block";
-            document.getElementById('prop-field-collision').style.display = "block";
-        }
-
-        function initiateTransformDrag(e) {
-            isDraggingTransform = true;
-            currentActiveScaleHandle = activeToolState === 'scale' ? arguments[1] : null;
-            startMouseX = e.clientX; startMouseY = e.clientY;
-            
-            if(selectedToolNodeTarget) {
-                startObjLeft = selectedToolNodeTarget.obj.left;
-                startObjTop = selectedToolNodeTarget.obj.top;
-            } else {
-                startObjLeft = selectedObjectTarget.left; startObjTop = selectedObjectTarget.top;
-                startObjWidth = selectedObjectTarget.width; startObjHeight = selectedObjectTarget.height;
-            }
-            
-            document.addEventListener('mousemove', processTransformDrag);
-            document.addEventListener('mouseup', () => {
-                isDraggingTransform = false;
-                document.removeEventListener('mousemove', processTransformDrag);
-            });
-        }
-
-        function processTransformDrag(e) {
-            if(!isDraggingTransform) return;
-            let deltaX = (e.clientX - startMouseX) / currentZoomScale;
-            let deltaY = (e.clientY - startMouseY) / currentZoomScale;
-            
-            if(selectedToolNodeTarget) {
-                selectedToolNodeTarget.obj.left = startObjLeft + deltaX;
-                selectedToolNodeTarget.obj.top = startObjTop + deltaY;
-                selectedToolNodeTarget.element.style.left = selectedToolNodeTarget.obj.left + "px";
-                selectedToolNodeTarget.element.style.top = selectedToolNodeTarget.obj.top + "px";
-                return;
-            }
-
-            if(activeToolState === 'move') {
-                selectedObjectTarget.left = startObjLeft + deltaX;
-                selectedObjectTarget.top = startObjTop + deltaY;
-                if(selectedObjectTarget.type === 'moving') {
-                    selectedObjectTarget.nodeA.x = selectedObjectTarget.left;
-                    selectedObjectTarget.nodeB.x = selectedObjectTarget.left + 200;
-                }
-            } else if(activeToolState === 'scale' && currentActiveScaleHandle) {
-                let angleDeg = selectedObjectTarget.rotation || 0;
-                let rad = angleDeg * Math.PI / 180;
-                
-                let localDX = deltaX * Math.cos(-rad) - deltaY * Math.sin(-rad);
-                let localDY = deltaX * Math.sin(-rad) + deltaY * Math.cos(-rad);
-
-                if(currentActiveScaleHandle === 'r') {
-                    selectedObjectTarget.width = Math.max(15, startObjWidth + localDX);
-                }
-                if(currentActiveScaleHandle === 'l') { 
-                    let newW = Math.max(15, startObjWidth - localDX);
-                    let change = startObjWidth - newW;
-                    selectedObjectTarget.width = newW;
-                    selectedObjectTarget.left = startObjLeft + change * Math.cos(rad);
-                    selectedObjectTarget.top = startObjTop + change * Math.sin(rad);
-                }
-                if(currentActiveScaleHandle === 'b') {
-                    selectedObjectTarget.height = Math.max(15, startObjHeight + localDY);
-                }
-                if(currentActiveScaleHandle === 't') {
-                    let newH = Math.max(15, startObjHeight - localDY);
-                    let change = startObjHeight - newH;
-                    selectedObjectTarget.height = newH;
-                    selectedObjectTarget.left = startObjLeft - change * Math.sin(rad);
-                    selectedObjectTarget.top = startObjTop + change * Math.cos(rad);
-                }
-            }
-            updateObjectElementPositionDOM(selectedObjectTarget);
-            if(activeToolState === 'scale') {
-                let el = document.getElementById(selectedObjectTarget.id);
-                appendScaleHandlesDOM(el);
-            }
-        }
-
-        function updateSelectedObjectProperties() {
-            if(!selectedObjectTarget) return;
-            selectedObjectTarget.material = document.getElementById('prop-material').value;
-            selectedObjectTarget.color = document.getElementById('prop-color').value;
-            selectedObjectTarget.rotation = parseInt(document.getElementById('prop-rotation').value) || 0;
-            selectedObjectTarget.collide = (document.getElementById('prop-collide').value === "true");
-            selectedObjectTarget.speed = parseFloat(document.getElementById('prop-speed').value) || 4;
-            selectedObjectTarget.dragOn = document.getElementById('prop-drag-on').checked;
-            
-            if(selectedObjectTarget.shape === 'sign') {
-                selectedObjectTarget.text = document.getElementById('prop-text').value;
-            }
-            
-            updateObjectElementPositionDOM(selectedObjectTarget);
-        }
-
-        function deleteSelectedObject() {
-            if(selectedToolNodeTarget) {
-                document.getElementById(selectedToolNodeTarget.obj.id)?.remove();
-                droppedTools = droppedTools.filter(t => t.id !== selectedToolNodeTarget.obj.id);
-                clearSelectionStates();
-                return;
-            }
-            if(!selectedObjectTarget) return;
-            document.getElementById(selectedObjectTarget.id)?.remove();
-            sceneObjects = sceneObjects.filter(o => o.id !== selectedObjectTarget.id);
-            clearSelectionStates();
-        }
-
-        function advanceLinearNodeTrack(obj, stepSeconds) {
-            let target = (obj.targetNode === 'A') ? obj.nodeA : obj.nodeB;
-            let dx = target.x - obj.left, dy = target.y - obj.top;
-            let dist = Math.sqrt(dx*dx + dy*dy), frameAmt = obj.speed * meterScaleFactor * stepSeconds;
-            if(dist <= frameAmt) { obj.left = target.x; obj.top = target.y; obj.targetNode = (obj.targetNode === 'B') ? 'A' : 'B'; }
-            else { obj.left += (dx / dist) * frameAmt; obj.top += (dy / dist) * frameAmt; }
-        }
-
-        function generateSaveString() {
-            let pkg = { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack };
-            prompt("Copy code output:", JSON.stringify(pkg));
-        }
-
-        function executeProjectPublishPipeline() {
-            let title = document.getElementById('pub-title').value.trim();
-            let desc = document.getElementById('pub-desc').value.trim();
-            let user = document.getElementById('pub-user').value.trim();
-            let pass = document.getElementById('pub-pass').value;
-
-            if(!title || !desc || !user || !pass) {
-                return alert("Please fill out all publishing fields.");
-            }
-            if (!RegisteredUserAccountsDatabase.hasOwnProperty(user) || RegisteredUserAccountsDatabase[user] !== pass) {
-                return alert("Publishing Refused: Verification failed.");
-            }
-
-            let publishPayload = {
-                meta: { title: title, desc: desc, author: user },
-                data: { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack }
-            };
-            prompt("Verified! Package generated. Copy this project string:", JSON.stringify(publishPayload));
-            document.getElementById('pub-pass').value = "";
-            document.getElementById('publish-overlay').style.display = 'none';
-        }
-
-        function loadFromString() {
-            let str = document.getElementById('load-string-input').value.trim();
-            if(!str) return alert("Input empty.");
-            try {
-                let parsed = JSON.parse(str);
-                sceneObjects.forEach(o => document.getElementById(o.id)?.remove());
-                droppedTools.forEach(t => document.getElementById(t.id)?.remove());
-                
-                totalMapMeters = parsed.mapSize || 40;
-                sceneObjects = parsed.objects || (parsed.data ? parsed.data.objects : []);
-                droppedTools = parsed.tools || (parsed.data ? parsed.data.tools : []);
-                defaultStarterPack = parsed.starters || (parsed.data ? parsed.data.starters : []);
-                
-                initializeStudioWorkspace();
-                sceneObjects.forEach(o => renderObjectElementDOM(o));
-                droppedTools.forEach(t => {
-                    let el = document.createElement('div');
-                    el.id = t.id; el.className = 'dropped-tool';
-                    el.style.backgroundImage = `url('${t.type}.png')`;
-                    el.style.left = t.left + "px"; el.style.top = t.top + "px";
-                    el.addEventListener('mousedown', (e) => { e.stopPropagation(); if(isPlaytesting) return; selectToolNodeTarget(t, el); });
-                    document.getElementById('map-grid').appendChild(el);
-                });
-                clearSelectionStates();
-            } catch(e) { alert("Data structure parse error."); }
-        }
+        } catch(e) { alert("Data structure parse error."); }
+    }
     </script>
 </body>
 </html>
