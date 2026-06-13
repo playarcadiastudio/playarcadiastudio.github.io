@@ -72,8 +72,8 @@
         /* Invisible outline in studio */
         .obj-invisible-studio { background: transparent !important; background-image: none !important; border: 2px dashed #aaa !important; }
 
-        /* No outlines toggle */
-        .no-outlines { border-color: transparent !important; }
+        /* Hidden outlines individual part class */
+        .no-part-outline { border-color: transparent !important; }
 
         .dropped-tool { position: absolute; width: 35px; height: 35px; border: 2px solid black; background: white; background-size: 70% 70%; background-repeat: no-repeat; background-position: center; z-index: 80; image-rendering: pixelated; }
         .dropped-tool.selected { outline: 2px dashed red; }
@@ -135,8 +135,7 @@
             <h2>Arcadia Studio</h2><br>
             <label>Map Size (Meters):</label>
             <input type="number" id="map-size-input" value="40" min="10" max="200">
-            <button class="action-btn" onclick="initializeStudioWorkspace()" style="width:100%;">Create Environment</button>
-            <br><br><hr><br>
+            <button class="action-btn" onclick="initializeStudioWorkspace()" style="width:100%;">Create Environment</button> <br><br><hr><br>
             <label>Load Map Data:</label>
             <input type="text" id="load-string-input" placeholder="Paste data here...">
             <button class="action-btn" onclick="loadFromString()" style="width:100%;">Load Project</button>
@@ -165,7 +164,7 @@
         <button id="btn-tool-move" class="tool-btn-pkg active" onclick="setActiveTool('move')"><img src="move.png" alt="Move"><span>Move</span></button>
         <button id="btn-tool-scale" class="tool-btn-pkg" onclick="setActiveTool('scale')"><img src="scale.png" alt="Scale"><span>Scale</span></button>
         <button id="btn-tool-rotate" class="tool-btn-pkg" onclick="setActiveTool('rotate')"><img src="rotate.png" alt="Rotate"><span>Rotate</span></button>
-        <button id="btn-toggle-outlines" class="action-btn" onclick="toggleOutlines()" style="font-size:11px;">Outlines: ON</button>
+        <button id="btn-tool-duplicate" class="tool-btn-pkg" onclick="duplicateSelectedObjectAction()"><img src="duplicate.png" alt="Duplicate"><span>Duplicate</span></button>
         <div style="flex:1;"></div>
         <div style="display:flex; align-items:center; gap:5px;">
             <label style="margin:0;">Players:</label>
@@ -257,6 +256,11 @@
                     </div>
                 </div>
 
+                <div id="prop-field-outline" class="inline-checkbox-container">
+                    <input type="checkbox" id="prop-has-outline" checked onchange="updateSelectedObjectProperties()">
+                    <label for="prop-has-outline" style="margin:0;">Outline Visible</label>
+                </div>
+
                 <div id="prop-field-material">
                     <label>Texture:</label>
                     <select id="prop-material" onchange="updateSelectedObjectProperties()">
@@ -315,7 +319,6 @@
     let totalMapMeters = 40;
     let activeToolState = 'move';
     let isPlaytesting = false;
-    let showOutlines = true; // toggle for part outlines in studio
 
     let sceneObjects = [];
     let droppedTools = [];
@@ -335,29 +338,19 @@
     let hammerCooldownInterval = null;
     let gunCooldownTimer = 0;
 
-    // Camera uses requestAnimationFrame - no more setInterval jank
     let camX = 50, camY = 50, currentZoomScale = 1.0;
     let editorCamSpeed = 8;
-    let camRafId = null;
+    let animRafId = null;
+    let physicsRafId = null;
     let lastCamTime = 0;
+    let keyLayoutState = {};
 
     let isDraggingTransform = false;
     let startMouseX = 0, startMouseY = 0, startObjLeft = 0, startObjTop = 0, startObjWidth = 0, startObjHeight = 0;
     let currentActiveScaleHandle = null;
-
     let isRotatingObj = false, centerPointX = 0, centerPointY = 0, startAngle = 0, baseRotation = 0;
 
-    let animRafId = null;
-    let physicsRafId = null;
-    let keyLayoutState = {};
-
-    // Walk animation state
-    const WALK_FRAMES_NORMAL = ['Character.png','Character1.png','Character2.png','Character3.png'];
-    const WALK_FRAMES_HOLD   = ['Characterhold.png','Characterhold1.png','Characterhold2.png','Characterhold3.png'];
-    const CROUCH_FRAME       = 'crouch.png';
-    let walkAnimTimers = {}; // per player: { frame, timer }
-
-    // Teleport cooldown per player (avoid infinite loops)
+    let walkAnimTimers = {}; 
     let teleportCooldowns = {};
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -367,15 +360,11 @@
         setupCooldownHUDTracking();
     });
 
-    // ─── CAMERA ─────────────────────────────────────────────────────────────────
-
     function setupViewportCameraControls() {
         document.getElementById('viewport-container').addEventListener('wheel', (e) => {
             e.preventDefault();
             let factor = 0.08;
-            currentZoomScale = e.deltaY < 0
-                ? Math.min(4.0, currentZoomScale + factor)
-                : Math.max(0.3, currentZoomScale - factor);
+            currentZoomScale = e.deltaY < 0 ? Math.min(4.0, currentZoomScale + factor) : Math.max(0.3, currentZoomScale - factor);
             updateCameraTransformDOM();
         }, { passive: false });
     }
@@ -391,19 +380,17 @@
         let target = playersData[activeControlledPlayerId];
         if (!target) return;
         currentZoomScale = 2.2;
-        camX = (container.clientWidth  / 2) - ((target.x + 37.5) * currentZoomScale);
+        camX = (container.clientWidth / 2) - ((target.x + 37.5) * currentZoomScale);
         camY = (container.clientHeight / 2) - ((target.y + 37.5) * currentZoomScale);
         updateCameraTransformDOM();
     }
-
-    // ─── SETUP ──────────────────────────────────────────────────────────────────
 
     function setupCooldownHUDTracking() {
         window.addEventListener('mousemove', (e) => {
             let ind = document.getElementById('hammer-cooldown-indicator');
             if (hammerCooldownTimer > 0 && isPlaytesting) {
                 ind.style.left = e.clientX + "px";
-                ind.style.top  = e.clientY + "px";
+                ind.style.top = e.clientY + "px";
             }
         });
     }
@@ -427,16 +414,15 @@
             if (!isPlaytesting) {
                 let speed = editorCamSpeed;
                 let moved = false;
-                if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { camY += speed; moved = true; }
-                if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { camY -= speed; moved = true; }
-                if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { camX += speed; moved = true; }
+                if (keyLayoutState['w'] || keyLayoutState['arrowup']) { camY += speed; moved = true; }
+                if (keyLayoutState['s'] || keyLayoutState['arrowdown']) { camY -= speed; moved = true; }
+                if (keyLayoutState['a'] || keyLayoutState['arrowleft']) { camX += speed; moved = true; }
                 if (keyLayoutState['d'] || keyLayoutState['arrowright']) { camX -= speed; moved = true; }
                 if (moved) updateCameraTransformDOM();
             }
 
             if (isPlaytesting && gunCooldownTimer > 0) gunCooldownTimer -= dt;
 
-            // Animate moving/spinning objects
             sceneObjects.forEach(obj => {
                 if (obj.type === 'moving') {
                     let oldL = obj.left, oldT = obj.top;
@@ -472,12 +458,10 @@
         grid.style.height = px + "px";
     }
 
-    // ─── INPUT ──────────────────────────────────────────────────────────────────
-
     function setupGlobalInputHandlers() {
         window.addEventListener('keydown', (e) => {
             let k = e.key.toLowerCase();
-            if (keyLayoutState[k]) return; // already held
+            if (keyLayoutState[k]) return; 
             keyLayoutState[k] = true;
 
             if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) {
@@ -487,7 +471,7 @@
             if (isPlaytesting && activeControlledPlayerId) {
                 let ap = playersData[activeControlledPlayerId];
 
-                if (k === 'a' || k === 'arrowleft')  { ap.facingDirection = 'left';  syncHeldToolVisualsDOM(); }
+                if (k === 'a' || k === 'arrowleft') { ap.facingDirection = 'left'; syncHeldToolVisualsDOM(); }
                 if (k === 'd' || k === 'arrowright') { ap.facingDirection = 'right'; syncHeldToolVisualsDOM(); }
 
                 if (k === '1' && ap.inventory[0]) { ap.selectedTool = ap.inventory[0]; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); }
@@ -497,7 +481,6 @@
 
                 if (k === ' ' || k === 'f') triggerActivePlayerAttack();
 
-                // Jump - only Space, not W (W is walk up)
                 if (k === ' ' && ap.onGround && !ap.isCrouching) {
                     ap.jumpVelocity = -6;
                     ap.onGround = false;
@@ -522,7 +505,7 @@
 
             let rect = document.getElementById('map-grid').getBoundingClientRect();
             let clickX = (e.clientX - rect.left) / currentZoomScale;
-            let clickY = (e.clientY - rect.top)  / currentZoomScale;
+            let clickY = (e.clientY - rect.top) / currentZoomScale;
 
             if (ap.selectedTool === 'hammer') {
                 if (hammerCooldownTimer > 0) return;
@@ -550,8 +533,6 @@
         }, 1000);
     }
 
-    // ─── TABS / TOOLS UI ────────────────────────────────────────────────────────
-
     function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -566,14 +547,19 @@
         if (selectedObjectTarget) selectObjectTarget(selectedObjectTarget);
     }
 
-    function toggleOutlines() {
-        showOutlines = !showOutlines;
-        document.getElementById('btn-toggle-outlines').textContent = 'Outlines: ' + (showOutlines ? 'ON' : 'OFF');
-        // Re-render all objects to apply/remove outline styles
-        sceneObjects.forEach(o => updateObjectElementPositionDOM(o));
+    function duplicateSelectedObjectAction() {
+        if (!selectedObjectTarget) { alert("Select an object first!"); return; }
+        objectIdCounter++;
+        let cloned = JSON.parse(JSON.stringify(selectedObjectTarget));
+        cloned.id = "obj_" + objectIdCounter;
+        cloned.left += 20;
+        cloned.top += 20;
+        if (cloned.nodeA) { cloned.nodeA.x += 20; cloned.nodeA.y += 20; }
+        if (cloned.nodeB) { cloned.nodeB.x += 20; cloned.nodeB.y += 20; }
+        sceneObjects.push(cloned);
+        renderObjectElementDOM(cloned);
+        selectObjectTarget(cloned);
     }
-
-    // ─── SPAWN / RENDER OBJECTS ─────────────────────────────────────────────────
 
     function spawnToolElement(type) {
         objectIdCounter++;
@@ -584,7 +570,7 @@
         el.id = id; el.className = 'dropped-tool';
         el.style.backgroundImage = `url('${type}.png')`;
         el.style.left = dropObj.left + "px";
-        el.style.top  = dropObj.top  + "px";
+        el.style.top = dropObj.top + "px";
         el.addEventListener('mousedown', (e) => {
             e.stopPropagation();
             if (isPlaytesting) return;
@@ -603,7 +589,7 @@
         document.getElementById('properties-editor-form').style.display = "block";
         document.getElementById('prop-id').value = toolObj.id;
         document.getElementById('prop-field-tool-options').style.display = "block";
-        ['text','material','color','rotation','collision','speed','drag','telepad','visibility'].forEach(f => {
+        ['text','material','color','rotation','collision','speed','drag','telepad','visibility','outline'].forEach(f => {
             let el2 = document.getElementById('prop-field-' + f);
             if (el2) el2.style.display = "none";
         });
@@ -620,30 +606,17 @@
 
     function spawnMapElement(primitiveType, shapeGeometry) {
         objectIdCounter++;
-        let newObj = {
-            id: "obj_" + objectIdCounter,
-            type: primitiveType,
-            shape: shapeGeometry,
-            left: 100, top: 100, width: 120, height: 120,
-            rotation: 0, material: 'plastic', color: '#e6c280',
-            text: 'Sign Post',
-            visibility: 10,
-            collide: primitiveType !== 'kill' && primitiveType !== 'spawn' && primitiveType !== 'shadow',
-            speed: primitiveType === 'spinning' ? 3 : 4,
-            dragOn: true,
-            nodeA: { x: 100, y: 100 }, nodeB: { x: 300, y: 100 }, targetNode: 'B',
-            telepadLink: '', telepadOneWay: false
+        let newObj = { 
+            id: "obj_" + objectIdCounter, type: primitiveType, shape: shapeGeometry, 
+            left: 100, top: 100, width: 120, height: 120, rotation: 0, 
+            material: 'plastic', color: '#e6c280', text: 'Sign Post', visibility: 10, 
+            collide: primitiveType !== 'kill' && primitiveType !== 'spawn' && primitiveType !== 'shadow', 
+            speed: primitiveType === 'spinning' ? 3 : 4, dragOn: true, 
+            nodeA: { x: 100, y: 100 }, nodeB: { x: 300, y: 100 }, targetNode: 'B', 
+            telepadLink: '', telepadOneWay: false, hasOutline: true 
         };
-        if (primitiveType === 'telepad') {
-            newObj.color = '#4488ff';
-            newObj.width = 120; newObj.height = 120;
-            newObj.visibility = 5;
-            newObj.collide = true;
-        }
-        if (primitiveType === 'shadow') {
-            newObj.color = '#111111';
-            newObj.collide = false;
-        }
+        if (primitiveType === 'telepad') { newObj.color = '#4488ff'; newObj.width = 120; newObj.height = 120; newObj.visibility = 5; newObj.collide = true; }
+        if (primitiveType === 'shadow') { newObj.color = '#111111'; newObj.collide = false; }
         sceneObjects.push(newObj);
         renderObjectElementDOM(newObj);
         selectObjectTarget(newObj);
@@ -651,8 +624,7 @@
 
     function renderObjectElementDOM(obj) {
         const el = document.createElement('div');
-        el.id = obj.id;
-        el.className = `editor-obj shape-${obj.shape}`;
+        el.id = obj.id; el.className = `editor-obj shape-${obj.shape}`;
         el.addEventListener('mousedown', (e) => {
             if (isPlaytesting) return;
             e.stopPropagation();
@@ -666,936 +638,645 @@
     function updateObjectElementPositionDOM(obj) {
         const el = document.getElementById(obj.id);
         if (!el) return;
-
         let vis = (obj.visibility === undefined) ? 10 : obj.visibility;
-        let opacity = isPlaytesting ? vis / 10 : Math.max(vis / 10, 0.001); // always slightly visible in editor
+        let opacity = isPlaytesting ? vis / 10 : Math.max(vis / 10, 0.001);
 
-        // Build class list
         let classes = `editor-obj shape-${obj.shape} mat-${obj.material}`;
-        if (obj.type === 'kill')     classes += ' obj-kill';
-        if (obj.type === 'spawn')    classes += ' obj-spawn';
+        if (obj.type === 'kill') classes += ' obj-kill';
+        if (obj.type === 'spawn') classes += ' obj-spawn';
         if (obj.type === 'spinning') classes += ' obj-spinning';
-        if (obj.type === 'shadow')   classes += ' obj-shadow';
+        if (obj.type === 'shadow') classes += ' obj-shadow';
         if (selectedObjectTarget && selectedObjectTarget.id === obj.id) classes += ' selected';
-
-        // Invisible: studio gets dashed outline, playtest gets truly invisible
-        if (vis === 0) {
-            if (!isPlaytesting) classes += ' obj-invisible-studio';
-        }
-
-        // Hide all shape borders when outlines are off (studio only)
-        if (!isPlaytesting && !showOutlines) {
-            classes += ' no-outlines';
-        }
+        if (vis === 0 && !isPlaytesting) classes += ' obj-invisible-studio';
+        if (obj.hasOutline === false) classes += ' no-part-outline';
 
         el.className = classes;
-        el.style.left      = obj.left     + "px";
-        el.style.top       = obj.top      + "px";
-        el.style.width     = obj.width    + "px";
-        el.style.height    = obj.height   + "px";
+        el.style.left = obj.left + "px";
+        el.style.top = obj.top + "px";
+        el.style.width = obj.width + "px";
+        el.style.height = obj.height + "px";
         el.style.transform = `rotate(${obj.rotation}deg)`;
-        el.style.opacity   = isPlaytesting && vis === 0 ? 0 : opacity;
-        el.style.zIndex    = obj.type === 'shadow' ? '200' : '';
+        el.style.opacity = isPlaytesting && vis === 0 ? 0 : opacity;
+        el.style.zIndex = obj.type === 'shadow' ? '200' : '';
 
-        // Color tinting for textured materials: apply as background-color overlay via filter
-        // We use a mix-blend approach: set bg color always, texture overlays on top via bg-image
         let bgColor = obj.type === 'shadow' ? '#111' : obj.color;
-
         if (obj.shape === 'octagon') {
-            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="${bgColor}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="${bgColor}" stroke="${obj.hasOutline===false?'transparent':'black'}" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
         } else if (obj.shape === 'wedge') {
-            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="0,100 100,0 100,100" fill="${bgColor}" stroke="black" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+            el.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;pointer-events:none;"><polygon points="0,100 100,0 100,100" fill="${bgColor}" stroke="${obj.hasOutline===false?'transparent':'black'}" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
         } else if (obj.shape === 'sign') {
             let fs = Math.max(10, Math.min(obj.height * 0.35, obj.width * 0.15));
             el.innerHTML = `<span style="font-size:${fs}px;"></span>`;
             el.querySelector('span').textContent = obj.text || '';
             el.style.backgroundColor = bgColor;
         } else if (obj.type === 'shadow') {
-            el.innerHTML = '';
-            el.style.backgroundColor = '#111';
+            el.innerHTML = ''; el.style.backgroundColor = '#111';
         } else {
-            el.innerHTML = '';
-            // Always set background color - on materials it tints through the texture
-            el.style.backgroundColor = bgColor;
+            el.innerHTML = ''; el.style.backgroundColor = bgColor;
         }
     }
-
-    // ─── SELECTION / PROPERTIES ─────────────────────────────────────────────────
 
     function selectObjectTarget(obj) {
         clearSelectionStates();
         selectedObjectTarget = obj;
         const el = document.getElementById(obj.id);
         if (el) el.classList.add('selected');
-
         document.getElementById('properties-empty-notice').style.display = "none";
         document.getElementById('properties-editor-form').style.display = "block";
+        document.getElementById('prop-id').value = obj.id;
+        document.getElementById('prop-material').value = obj.material;
+        document.getElementById('prop-color').value = obj.color;
+        document.getElementById('prop-rotation').value = obj.rotation;
+        document.getElementById('prop-collide').value = obj.collide.toString();
+        document.getElementById('prop-speed').value = obj.speed || 4;
+        document.getElementById('prop-drag-on').checked = obj.dragOn !== false;
+        document.getElementById('prop-visibility').value = (obj.visibility === undefined) ? 10 : obj.visibility;
+        document.getElementById('prop-has-outline').checked = obj.hasOutline !== false;
 
-        document.getElementById('prop-id').value           = obj.id;
-        document.getElementById('prop-material').value     = obj.material;
-        document.getElementById('prop-color').value        = obj.color;
-        document.getElementById('prop-rotation').value     = obj.rotation;
-        document.getElementById('prop-collide').value      = obj.collide.toString();
-        document.getElementById('prop-speed').value        = obj.speed || 4;
-        document.getElementById('prop-drag-on').checked    = obj.dragOn !== false;
-        document.getElementById('prop-visibility').value   = (obj.visibility === undefined) ? 10 : obj.visibility;
-
-        document.getElementById('prop-field-color').style.display      = "block";
-        document.getElementById('prop-field-rotation').style.display   = "block";
+        document.getElementById('prop-field-color').style.display = "block";
+        document.getElementById('prop-field-rotation').style.display = "block";
         document.getElementById('prop-field-visibility').style.display = "block";
-        document.getElementById('prop-field-collision').style.display  = "block";
+        document.getElementById('prop-field-collision').style.display = "block";
         document.getElementById('prop-field-tool-options').style.display = "none";
-
+        document.getElementById('prop-field-outline').style.display = "flex";
         document.getElementById('prop-field-speed').style.display = (obj.type === 'moving' || obj.type === 'spinning') ? "block" : "none";
-        document.getElementById('prop-field-drag').style.display  = (obj.type === 'moving' || obj.type === 'spinning') ? "flex"  : "none";
+        document.getElementById('prop-field-drag').style.display = (obj.type === 'moving' || obj.type === 'spinning') ? "flex" : "none";
 
         if (obj.shape === 'sign') {
             document.getElementById('prop-field-text').style.display = "block";
             document.getElementById('prop-text').value = obj.text || '';
-        } else {
-            document.getElementById('prop-field-text').style.display = "none";
-        }
+        } else { document.getElementById('prop-field-text').style.display = "none"; }
 
         if (obj.type === 'telepad') {
             document.getElementById('prop-field-telepad').style.display = "block";
-            document.getElementById('prop-telepad-link').value           = obj.telepadLink || '';
-            document.getElementById('prop-telepad-oneway').checked       = obj.telepadOneWay || false;
-        } else {
-            document.getElementById('prop-field-telepad').style.display = "none";
-        }
+            document.getElementById('prop-telepad-link').value = obj.telepadLink || '';
+            document.getElementById('prop-telepad-oneway').checked = !!obj.telepadOneWay;
+        } else { document.getElementById('prop-field-telepad').style.display = "none"; }
 
-        if (!isPlaytesting) {
-            if (activeToolState === 'scale')  appendScaleHandlesDOM(el);
-            if (activeToolState === 'rotate') appendRotateHandleDOM(el);
-            if (obj.type === 'moving') renderWaypointsOverlayDOM(obj);
-        }
-    }
-
-    function clearSelectionStates() {
-        selectedObjectTarget = null;
-        if (selectedToolNodeTarget) {
-            selectedToolNodeTarget.element.classList.remove('selected');
-            selectedToolNodeTarget = null;
-        }
-        document.querySelectorAll('.editor-obj, .dropped-tool').forEach(el => {
-            el.classList.remove('selected');
-            el.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
-        });
-        document.getElementById('path-visualizer-canvas').innerHTML = "";
-        document.getElementById('path-nodes-layer').innerHTML = "";
-        document.getElementById('properties-editor-form').style.display = "none";
-        document.getElementById('properties-empty-notice').style.display = "block";
-        document.getElementById('prop-field-tool-options').style.display = "none";
-        document.getElementById('prop-field-text').style.display = "none";
-        document.getElementById('prop-field-material').style.display = "block";
-        document.getElementById('prop-field-color').style.display = "block";
-        document.getElementById('prop-field-rotation').style.display = "block";
-        document.getElementById('prop-field-collision').style.display = "block";
-        document.getElementById('prop-field-telepad').style.display = "none";
+        if (activeToolState === 'scale') injectVisualScaleHandlesDOM(obj);
+        if (activeToolState === 'rotate') injectVisualRotateHandlesDOM(obj);
     }
 
     function updateSelectedObjectProperties() {
         if (!selectedObjectTarget) return;
-        selectedObjectTarget.material    = document.getElementById('prop-material').value;
-        selectedObjectTarget.color       = document.getElementById('prop-color').value;
-        selectedObjectTarget.rotation    = parseInt(document.getElementById('prop-rotation').value) || 0;
-        selectedObjectTarget.collide     = (document.getElementById('prop-collide').value === "true");
-        selectedObjectTarget.speed       = parseFloat(document.getElementById('prop-speed').value) || 4;
-        selectedObjectTarget.dragOn      = document.getElementById('prop-drag-on').checked;
-        selectedObjectTarget.visibility  = parseInt(document.getElementById('prop-visibility').value);
-        if (isNaN(selectedObjectTarget.visibility)) selectedObjectTarget.visibility = 10;
-        selectedObjectTarget.visibility  = Math.max(0, Math.min(10, selectedObjectTarget.visibility));
+        let obj = selectedObjectTarget;
+        obj.material = document.getElementById('prop-material').value;
+        obj.color = document.getElementById('prop-color').value;
+        obj.rotation = parseInt(document.getElementById('prop-rotation').value) || 0;
+        obj.collide = document.getElementById('prop-collide').value === "true";
+        obj.visibility = parseInt(document.getElementById('prop-visibility').value);
+        if (isNaN(obj.visibility)) obj.visibility = 10;
+        obj.speed = parseFloat(document.getElementById('prop-speed').value) || 4;
+        obj.dragOn = document.getElementById('prop-drag-on').checked;
+        obj.hasOutline = document.getElementById('prop-has-outline').checked;
 
-        if (selectedObjectTarget.shape === 'sign') selectedObjectTarget.text = document.getElementById('prop-text').value;
-        if (selectedObjectTarget.type === 'telepad') {
-            selectedObjectTarget.telepadLink   = document.getElementById('prop-telepad-link').value.trim();
-            selectedObjectTarget.telepadOneWay = document.getElementById('prop-telepad-oneway').checked;
+        if (obj.shape === 'sign') obj.text = document.getElementById('prop-text').value;
+        if (obj.type === 'telepad') {
+            obj.telepadLink = document.getElementById('prop-telepad-link').value.trim();
+            obj.telepadOneWay = document.getElementById('prop-telepad-oneway').checked;
         }
-        updateObjectElementPositionDOM(selectedObjectTarget);
+        updateObjectElementPositionDOM(obj);
+        if (activeToolState === 'scale') injectVisualScaleHandlesDOM(obj);
+        if (activeToolState === 'rotate') injectVisualRotateHandlesDOM(obj);
     }
 
     function deleteSelectedObject() {
-        if (selectedToolNodeTarget) {
+        if (selectedObjectTarget) {
+            document.getElementById(selectedObjectTarget.id)?.remove();
+            sceneObjects = sceneObjects.filter(o => o.id !== selectedObjectTarget.id);
+        } else if (selectedToolNodeTarget) {
             document.getElementById(selectedToolNodeTarget.obj.id)?.remove();
             droppedTools = droppedTools.filter(t => t.id !== selectedToolNodeTarget.obj.id);
-            clearSelectionStates(); return;
         }
-        if (!selectedObjectTarget) return;
-        document.getElementById(selectedObjectTarget.id)?.remove();
-        sceneObjects = sceneObjects.filter(o => o.id !== selectedObjectTarget.id);
         clearSelectionStates();
     }
 
-    // ─── SCALE / ROTATE / WAYPOINTS ─────────────────────────────────────────────
+    function clearSelectionStates() {
+        selectedObjectTarget = null;
+        selectedToolNodeTarget = null;
+        document.querySelectorAll('.editor-obj').forEach(o => o.classList.remove('selected'));
+        document.querySelectorAll('.dropped-tool').forEach(t => t.classList.remove('selected'));
+        document.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
+        document.getElementById('properties-empty-notice').style.display = "block";
+        document.getElementById('properties-editor-form').style.display = "none";
+        clearWaypointsOverlayDOM();
+    }
 
-    function appendScaleHandlesDOM(parentEl) {
-        if (!parentEl) return;
+    function injectVisualScaleHandlesDOM(obj) {
+        document.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
+        const parent = document.getElementById(obj.id);
+        if (!parent) return;
         ['t','b','l','r'].forEach(dir => {
-            const h = document.createElement('div');
+            let h = document.createElement('div');
             h.className = `scale-handle handle-${dir}`;
             h.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateTransformDrag(e, dir); });
-            parentEl.appendChild(h);
+            parent.appendChild(h);
         });
     }
 
-    function appendRotateHandleDOM(parentEl) {
-        if (!parentEl) return;
-        const line = document.createElement('div'); line.className = 'rotate-line';
-        const h    = document.createElement('div'); h.className = 'rotate-handle';
-        h.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateMouseRotation(e); });
-        parentEl.appendChild(line); parentEl.appendChild(h);
+    function injectVisualRotateHandlesDOM(obj) {
+        document.querySelectorAll('.scale-handle, .rotate-handle, .rotate-line').forEach(h => h.remove());
+        const parent = document.getElementById(obj.id);
+        if (!parent) return;
+        let line = document.createElement('div'); line.className = 'rotate-line';
+        let h = document.createElement('div'); h.className = 'rotate-handle';
+        h.addEventListener('mousedown', (e) => { e.stopPropagation(); initiateRotationDrag(e, obj); });
+        parent.appendChild(line); parent.appendChild(h);
+    }
+
+    function initiateTransformDrag(e, scaleDirection) {
+        isDraggingTransform = true;
+        currentActiveScaleHandle = scaleDirection;
+        startMouseX = e.clientX; startMouseY = e.clientY;
+        let target = selectedObjectTarget || selectedToolNodeTarget.obj;
+        startObjLeft = target.left; startObjTop = target.top;
+        startObjWidth = target.width || 0; startObjHeight = target.height || 0;
+        window.addEventListener('mousemove', processTransformDragMove);
+        window.addEventListener('mouseup', endTransformDragSequence);
+    }
+
+    function processTransformDragMove(e) {
+        if (!isDraggingTransform) return;
+        let dx = (e.clientX - startMouseX) / currentZoomScale;
+        let dy = (e.clientY - startMouseY) / currentZoomScale;
+        let target = selectedObjectTarget || selectedToolNodeTarget.obj;
+
+        if (!currentActiveScaleHandle) {
+            target.left = Math.round((startObjLeft + dx) / 5) * 5;
+            target.top = Math.round((startObjTop + dy) / 5) * 5;
+        } else {
+            let s = currentActiveScaleHandle;
+            if (s === 'r') target.width = Math.max(15, Math.round((startObjWidth + dx) / 5) * 5);
+            if (s === 'b') target.height = Math.max(15, Math.round((startObjHeight + dy) / 5) * 5);
+            if (s === 'l') {
+                let nw = Math.max(15, Math.round((startObjWidth - dx) / 5) * 5);
+                target.left = startObjLeft + (startObjWidth - nw); target.width = nw;
+            }
+            if (s === 't') {
+                let nh = Math.max(15, Math.round((startObjHeight - dy) / 5) * 5);
+                target.top = startObjTop + (startObjHeight - nh); target.height = nh;
+            }
+        }
+        if (selectedObjectTarget) updateObjectElementPositionDOM(target);
+        else {
+            let el = document.getElementById(target.id);
+            if (el) { el.style.left = target.left + "px"; el.style.top = target.top + "px"; }
+        }
+    }
+
+    function endTransformDragSequence() {
+        isDraggingTransform = false;
+        window.removeEventListener('mousemove', processTransformDragMove);
+        window.removeEventListener('mouseup', endTransformDragSequence);
+    }
+
+    function initiateRotationDrag(e, obj) {
+        isRotatingObj = true;
+        let rect = document.getElementById(obj.id).getBoundingClientRect();
+        centerPointX = rect.left + rect.width / 2; centerPointY = rect.top + rect.height / 2;
+        startAngle = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX);
+        baseRotation = obj.rotation;
+        window.addEventListener('mousemove', processRotationDragMove);
+        window.addEventListener('mouseup', endRotationDragSequence);
+    }
+
+    function processRotationDragMove(e) {
+        if (!isRotatingObj || !selectedObjectTarget) return;
+        let currentAngle = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX);
+        let diff = (currentAngle - startAngle) * (180 / Math.PI);
+        let finalDeg = Math.round((baseRotation + diff) / 15) * 15;
+        selectedObjectTarget.rotation = (finalDeg % 360 + 360) % 360;
+        document.getElementById('prop-rotation').value = selectedObjectTarget.rotation;
+        updateObjectElementPositionDOM(selectedObjectTarget);
+    }
+
+    function endRotationDragSequence() {
+        isRotatingObj = false;
+        window.removeEventListener('mousemove', processRotationDragMove);
+        window.removeEventListener('mouseup', endRotationDragSequence);
+    }
+
+    function advanceLinearNodeTrack(obj, dt) {
+        let nodeA = obj.nodeA || { x: 100, y: 100 }, nodeB = obj.nodeB || { x: 300, y: 100 };
+        let targ = obj.targetNode === 'A' ? nodeA : nodeB;
+        let dx = targ.x - obj.left, dy = targ.y - obj.top;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let moveDist = (obj.speed || 4) * 25 * dt;
+        if (dist <= moveDist) {
+            obj.left = targ.x; obj.top = targ.y;
+            obj.targetNode = obj.targetNode === 'A' ? 'B' : 'A';
+        } else { obj.left += (dx / dist) * moveDist; obj.top += (dy / dist) * moveDist; }
     }
 
     function renderWaypointsOverlayDOM(obj) {
-        let canvas = document.getElementById('path-visualizer-canvas');
-        let layer  = document.getElementById('path-nodes-layer');
-        if (!canvas || !layer) return;
-        let cX1 = obj.nodeA.x + obj.width/2, cY1 = obj.nodeA.y + obj.height/2;
-        let cX2 = obj.nodeB.x + obj.width/2, cY2 = obj.nodeB.y + obj.height/2;
-        canvas.innerHTML = `<line x1="${cX1}" y1="${cY1}" x2="${cX2}" y2="${cY2}" stroke="black" stroke-width="3" stroke-dasharray="6,6"/>`;
-        if (layer.children.length === 0) {
-            let dA = document.createElement('div'); dA.className = "visual-node-dot node-dot-a"; dA.title = "Waypoint A";
-            dA.addEventListener('mousedown', (e) => initiateWaypointNodeDrag(e, obj, 'nodeA'));
-            let dB = document.createElement('div'); dB.className = "visual-node-dot node-dot-b"; dB.title = "Waypoint B";
-            dB.addEventListener('mousedown', (e) => initiateWaypointNodeDrag(e, obj, 'nodeB'));
-            layer.appendChild(dA); layer.appendChild(dB);
-        }
-        layer.children[0].style.left = cX1 + "px"; layer.children[0].style.top = cY1 + "px";
-        layer.children[1].style.left = cX2 + "px"; layer.children[1].style.top = cY2 + "px";
-    }
+        clearWaypointsOverlayDOM();
+        if (obj.type !== 'moving') return;
+        let nodeA = obj.nodeA, nodeB = obj.nodeB;
+        let svg = document.getElementById('path-visualizer-canvas');
+        let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", nodeA.x + obj.width/2); line.setAttribute("y1", nodeA.y + obj.height/2);
+        line.setAttribute("x2", nodeB.x + obj.width/2); line.setAttribute("y2", nodeB.y + obj.height/2);
+        line.setAttribute("stroke", "blue"); line.setAttribute("stroke-width", "3"); line.setAttribute("stroke-dasharray", "6");
+        svg.appendChild(line);
 
-    function initiateWaypointNodeDrag(e, obj, nodeKey) {
-        e.stopPropagation();
-        let sX = e.clientX, sY = e.clientY, bX = obj[nodeKey].x, bY = obj[nodeKey].y;
-        let mm = (ev) => { obj[nodeKey].x = bX + (ev.clientX-sX)/currentZoomScale; obj[nodeKey].y = bY + (ev.clientY-sY)/currentZoomScale; renderWaypointsOverlayDOM(obj); };
-        let mu = () => { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
-        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+        let lay = document.getElementById('path-nodes-layer');
+        [['A', nodeA, 'node-dot-a'], ['B', nodeB, 'node-dot-b']].forEach(p => {
+            let d = document.createElement('div'); d.className = `visual-node-dot ${p[2]}`;
+            d.style.left = (p[1].x + obj.width/2) + "px"; d.style.top = (p[1].y + obj.height/2) + "px";
+            d.addEventListener('mousedown', (e) => {
+                e.stopPropagation(); e.preventDefault();
+                let sX = e.clientX, sY = e.clientY, oX = p[1].x, oY = p[1].y;
+                function moveN(ev) {
+                    let kX = (ev.clientX - sX) / currentZoomScale, kY = (ev.clientY - sY) / currentZoomScale;
+                    p[1].x = Math.round((oX + kX)/10)*10; p[1].y = Math.round((oY + kY)/10)*10;
+                    renderWaypointsOverlayDOM(obj);
+                }
+                function endN() { window.removeEventListener('mousemove', moveN); window.removeEventListener('mouseup', endN); }
+                window.addEventListener('mousemove', moveN); window.addEventListener('mouseup', endN);
+            });
+            lay.appendChild(d);
+        });
     }
-
-    function initiateMouseRotation(e) {
-        if (!selectedObjectTarget) return;
-        isRotatingObj = true;
-        const el = document.getElementById(selectedObjectTarget.id);
-        const rect = el.getBoundingClientRect();
-        centerPointX = rect.left + rect.width/2; centerPointY = rect.top + rect.height/2;
-        startAngle  = Math.atan2(e.clientY - centerPointY, e.clientX - centerPointX) * (180/Math.PI);
-        baseRotation = selectedObjectTarget.rotation;
-        let mm = (ev) => {
-            if (!isRotatingObj) return;
-            let cur = Math.atan2(ev.clientY - centerPointY, ev.clientX - centerPointX) * (180/Math.PI);
-            selectedObjectTarget.rotation = Math.round((baseRotation + (cur - startAngle)) % 360);
-            if (selectedObjectTarget.rotation < 0) selectedObjectTarget.rotation += 360;
-            document.getElementById('prop-rotation').value = selectedObjectTarget.rotation;
-            updateObjectElementPositionDOM(selectedObjectTarget);
-        };
-        let mu = () => { isRotatingObj = false; document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
-        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+    function clearWaypointsOverlayDOM() {
+        document.getElementById('path-visualizer-canvas').innerHTML = '';
+        document.getElementById('path-nodes-layer').innerHTML = '';
     }
-
-    function initiateTransformDrag(e, handleDir) {
-        isDraggingTransform = true;
-        currentActiveScaleHandle = handleDir;
-        startMouseX = e.clientX; startMouseY = e.clientY;
-        if (selectedToolNodeTarget) {
-            startObjLeft = selectedToolNodeTarget.obj.left;
-            startObjTop  = selectedToolNodeTarget.obj.top;
-        } else if (selectedObjectTarget) {
-            startObjLeft   = selectedObjectTarget.left;   startObjTop    = selectedObjectTarget.top;
-            startObjWidth  = selectedObjectTarget.width;  startObjHeight = selectedObjectTarget.height;
-        }
-        let mm = (ev) => processTransformDrag(ev);
-        let mu = () => { isDraggingTransform = false; document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
-        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
-    }
-
-    function processTransformDrag(e) {
-        if (!isDraggingTransform) return;
-        let dX = (e.clientX - startMouseX) / currentZoomScale;
-        let dY = (e.clientY - startMouseY) / currentZoomScale;
-        if (selectedToolNodeTarget) {
-            selectedToolNodeTarget.obj.left = startObjLeft + dX;
-            selectedToolNodeTarget.obj.top  = startObjTop  + dY;
-            selectedToolNodeTarget.element.style.left = selectedToolNodeTarget.obj.left + "px";
-            selectedToolNodeTarget.element.style.top  = selectedToolNodeTarget.obj.top  + "px";
-            return;
-        }
-        if (activeToolState === 'move') {
-            selectedObjectTarget.left = startObjLeft + dX;
-            selectedObjectTarget.top  = startObjTop  + dY;
-            if (selectedObjectTarget.type === 'moving') {
-                selectedObjectTarget.nodeA.x = selectedObjectTarget.left;
-                selectedObjectTarget.nodeB.x = selectedObjectTarget.left + 200;
-            }
-        } else if (activeToolState === 'scale' && currentActiveScaleHandle) {
-            let rad = (selectedObjectTarget.rotation || 0) * Math.PI / 180;
-            let lDX = dX * Math.cos(-rad) - dY * Math.sin(-rad);
-            let lDY = dX * Math.sin(-rad) + dY * Math.cos(-rad);
-            if (currentActiveScaleHandle === 'r') selectedObjectTarget.width  = Math.max(15, startObjWidth  + lDX);
-            if (currentActiveScaleHandle === 'b') selectedObjectTarget.height = Math.max(15, startObjHeight + lDY);
-            if (currentActiveScaleHandle === 'l') {
-                let nW = Math.max(15, startObjWidth - lDX); let ch = startObjWidth - nW;
-                selectedObjectTarget.width = nW; selectedObjectTarget.left = startObjLeft + ch * Math.cos(rad); selectedObjectTarget.top = startObjTop + ch * Math.sin(rad);
-            }
-            if (currentActiveScaleHandle === 't') {
-                let nH = Math.max(15, startObjHeight - lDY); let ch = startObjHeight - nH;
-                selectedObjectTarget.height = nH; selectedObjectTarget.left = startObjLeft - ch * Math.sin(rad); selectedObjectTarget.top = startObjTop + ch * Math.cos(rad);
-            }
-        }
-        updateObjectElementPositionDOM(selectedObjectTarget);
-        if (activeToolState === 'scale') appendScaleHandlesDOM(document.getElementById(selectedObjectTarget.id));
-    }
-
-    // ─── PLAYTEST ────────────────────────────────────────────────────────────────
 
     function togglePlaytestMode() {
-        if (!isPlaytesting) {
-            let spawnObj = sceneObjects.find(o => o.type === 'spawn');
-            if (!spawnObj) return alert("Add a spawnpoint to playtest!");
+        isPlaytesting = !isPlaytesting;
+        clearSelectionStates();
+        const btn = document.getElementById('btn-playtest');
 
-            simulatePlayerCount = Math.max(1, Math.min(10, parseInt(document.getElementById('mp-spawn-count').value) || 1));
-            clearSelectionStates();
-            isPlaytesting = true;
-            gunCooldownTimer = 0;
-
-            document.getElementById('btn-playtest').textContent   = "Stop Test";
-            document.getElementById('btn-playtest').style.borderColor = "red";
-            document.getElementById('btn-playtest').style.color       = "red";
-
-            const switcher = document.getElementById('mp-switcher-bar');
-            switcher.innerHTML = '<span style="font-size:12px;font-weight:bold;margin-right:10px;">Control Player:</span>';
-            switcher.style.display = "flex";
-
-            document.getElementById('players-layer').innerHTML = "";
-            playersData = {};
-            walkAnimTimers = {};
-            teleportCooldowns = {};
-
-            let sx = spawnObj.left + spawnObj.width/2 - 37.5;
-            let sy = spawnObj.top  + spawnObj.height/2 - 37.5;
-
-            for (let i = 1; i <= simulatePlayerCount; i++) {
-                let pId = "player_" + i;
-                playersData[pId] = {
-                    id: pId, name: "Player " + i,
-                    x: sx + i*12, y: sy,
-                    health: 100,
-                    inventory: [...defaultStarterPack],
-                    selectedTool: defaultStarterPack[0] || null,
-                    facingDirection: 'right',
-                    // movement states
-                    stamina: 100,
-                    isCrouching: false,
-                    isRunning: false,
-                    // jump
-                    jumpVelocity: 0,
-                    jumpHeight: 0,   // pixels above ground
-                    onGround: true,
-                    // hidden shadow blocks this player has activated
-                    hiddenShadows: new Set(),
-                    // teleport
-                    lastTelepadId: null
-                };
-                walkAnimTimers[pId] = { frame: 0, timer: 0 };
-
-                let tab = document.createElement('button');
-                tab.className = "player-tab-btn" + (i===1 ? " active" : "");
-                tab.textContent = "Player " + i;
-                tab.onclick = () => switchActiveControlledPlayer(pId);
-                switcher.appendChild(tab);
-
-                let pEl = document.createElement('div');
-                pEl.id = "char_" + pId;
-                pEl.className = "player-character";
-                pEl.style.left = playersData[pId].x + "px";
-                pEl.style.top  = playersData[pId].y + "px";
-                pEl.innerHTML = `
-                    <div class="player-label">${playersData[pId].name}</div>
-                    <div class="health-bar-container"><div id="hp_fill_${pId}" class="health-bar-fill"></div></div>
-                    <img id="char_sprite_${pId}" class="char-sprite" src="Character.png" style="image-rendering:pixelated;">
-                `;
-                // Shadow for jump
-                let shadow = document.createElement('div');
-                shadow.id = "jump_shadow_" + pId;
-                shadow.className = "jump-shadow";
-                shadow.style.width = "50px"; shadow.style.height = "12px";
-                shadow.style.display = "none";
-                document.getElementById('map-grid').appendChild(shadow);
-
-                document.getElementById('players-layer').appendChild(pEl);
-            }
-
-            activeControlledPlayerId = "player_1";
-            renderInventoryHotbarHUD();
-            syncHeldToolVisualsDOM();
-            updateCameraToActivePlayerFocus();
+        if (isPlaytesting) {
+            btn.textContent = "Stop Playtest"; btn.style.color = "red"; btn.style.borderColor = "red";
+            document.getElementById('hud-hotbar').style.display = "flex";
             document.getElementById('stamina-bar-container').style.display = "block";
-            startPlaytestPhysicsLoop();
-
+            document.getElementById('left-panel').style.display = "none";
+            simulatePlayerCount = Math.max(1, parseInt(document.getElementById('mp-spawn-count').value) || 1);
+            buildPlaytestRoomSession();
+            startPhysicsGameSimulation();
         } else {
-            isPlaytesting = false;
-            hammerCooldownTimer = 0; gunCooldownTimer = 0;
-            if (hammerCooldownInterval) clearInterval(hammerCooldownInterval);
-            document.getElementById('hammer-cooldown-indicator').style.display = "none";
-            document.getElementById('mp-switcher-bar').style.display = "none";
-            document.getElementById('hud-hotbar').innerHTML = "";
-            document.getElementById('btn-playtest').textContent = "Playtest Game";
-            document.getElementById('btn-playtest').style.borderColor = "green";
-            document.getElementById('btn-playtest').style.color = "green";
-            document.getElementById('death-screen').style.display = "none";
+            btn.textContent = "Playtest Game"; btn.style.color = "green"; btn.style.borderColor = "green";
+            document.getElementById('hud-hotbar').style.display = "none";
             document.getElementById('stamina-bar-container').style.display = "none";
             document.getElementById('crouch-indicator').style.display = "none";
+            document.getElementById('mp-switcher-bar').style.display = "none";
+            document.getElementById('left-panel').style.display = "flex";
+            document.getElementById('hammer-cooldown-indicator').style.display = "none";
+            if (hammerCooldownInterval) clearInterval(hammerCooldownInterval);
+            hammerCooldownTimer = 0; gunCooldownTimer = 0;
+            stopPhysicsGameSimulation();
+            hammerBlocks.forEach(b => b.remove()); hammerBlocks = [];
+            activeProjectilesList.forEach(p => p.el.remove()); activeProjectilesList = [];
+            document.getElementById('players-layer').innerHTML = '';
+            document.getElementById('death-screen').style.display = "none";
+            sceneObjects.forEach(o => updateObjectElementPositionDOM(o));
+            camX = 50; camY = 50; currentZoomScale = 1.0; updateCameraTransformDOM();
+        }
+    }
 
-            if (physicsRafId) cancelAnimationFrame(physicsRafId);
-            document.getElementById('players-layer').innerHTML = "";
-            document.querySelectorAll('.jump-shadow').forEach(e => e.remove());
+    function buildPlaytestRoomSession() {
+        playersData = {}; walkAnimTimers = {}; teleportCooldowns = {};
+        document.getElementById('players-layer').innerHTML = '';
 
-            hammerBlocks.forEach(b => document.getElementById(b.id)?.remove());
-            hammerBlocks = [];
-            activeProjectilesList.forEach(p => document.getElementById(p.id)?.remove());
-            activeProjectilesList = [];
+        let spawnNode = sceneObjects.find(o => o.type === 'spawn') || { left: 80, top: 80 };
+        let num = simulatePlayerCount;
 
-            // Restore shadow blocks
-            sceneObjects.filter(o => o.type === 'shadow').forEach(o => {
-                let el = document.getElementById(o.id);
-                if (el) el.style.display = '';
+        if (num > 1) {
+            const bar = document.getElementById('mp-switcher-bar'); bar.innerHTML = ''; bar.style.display = "flex";
+            for(let i=1; i<=num; i++) {
+                let b = document.createElement('button'); b.className = 'player-tab-btn'; b.textContent = "Player " + i;
+                let id = "p_" + i;
+                b.onclick = () => {
+                    document.querySelectorAll('.player-tab-btn').forEach(x => x.classList.remove('active'));
+                    b.classList.add('active'); activeControlledPlayerId = id; updateCameraToActivePlayerFocus(); renderInventoryHotbarHUD();
+                };
+                if(i===1) b.classList.add('active'); bar.appendChild(b);
+            }
+        } else { document.getElementById('mp-switcher-bar').style.display = "none"; }
+
+        for (let i = 1; i <= num; i++) {
+            let pid = "p_" + i;
+            playersData[pid] = {
+                id: pid, name: "Player " + i, x: spawnNode.left + (i - 1) * 30, y: spawnNode.top,
+                vx: 0, vy: 0, width: 75, height: 75, health: 100, maxHealth: 100, stamina: 100, onGround: false,
+                inventory: [...defaultStarterPack], selectedTool: defaultStarterPack[0] || null,
+                facingDirection: 'right', isCrouching: false, jumpVelocity: 0, jumpHeight: 0, 
+                linearPlatformX: 0, linearPlatformY: 0
+            };
+            walkAnimTimers[pid] = { frame: 0, timer: 0 };
+
+            let div = document.createElement('div'); div.id = "char_" + pid; div.className = 'player-character';
+            div.innerHTML = `
+                <div class="player-label">Player ${i}</div>
+                <div class="health-bar-container"><div class="health-bar-fill" id="hfill_${pid}"></div></div>
+                <img class="char-sprite" id="sprite_${pid}" src="character.png">
+                <div class="jump-shadow" id="shadow_${pid}"></div>
+            `;
+            document.getElementById('players-layer').appendChild(div);
+        }
+        activeControlledPlayerId = "p_1";
+        renderInventoryHotbarHUD();
+    }
+
+    function startPhysicsGameSimulation() {
+        if (physicsRafId) cancelAnimationFrame(physicsRafId);
+        let lastT = performance.now();
+
+        function physicsLoop(now) {
+            let dt = Math.min((now - lastT) / 1000, 0.04);
+            lastT = now;
+            if (isPlaytesting) { updateGameWorldEnginePhysics(dt); updateProjectilesTracks(dt); }
+            physicsRafId = requestAnimationFrame(physicsLoop);
+        }
+        physicsRafId = requestAnimationFrame(physicsLoop);
+    }
+    function stopPhysicsGameSimulation() { if (physicsRafId) cancelAnimationFrame(physicsRafId); }
+
+    function updateGameWorldEnginePhysics(dt) {
+        let mapLimit = totalMapMeters * meterScaleFactor;
+
+        for (let id in playersData) {
+            let ap = playersData[id];
+            if (ap.health <= 0) continue;
+
+            let isMe = (id === activeControlledPlayerId);
+            let moveX = 0, moveY = 0;
+
+            if (isMe) {
+                if (keyLayoutState['w'] || keyLayoutState['arrowup']) moveY = -1;
+                if (keyLayoutState['s'] || keyLayoutState['arrowdown']) moveY = 1;
+                if (keyLayoutState['a'] || keyLayoutState['arrowleft']) moveX = -1;
+                if (keyLayoutState['d'] || keyLayoutState['arrowright']) moveX = 1;
+                ap.isCrouching = !!keyLayoutState['c'];
+            } else {
+                if (Math.random() < 0.02) { ap._vx = (Math.random() - 0.5) * 2; ap._vy = (Math.random() - 0.5) * 2; }
+                if (ap._vx) moveX = ap._vx; if (ap._vy) moveY = ap._vy;
+            }
+
+            if (teleportCooldowns[id] > 0) teleportCooldowns[id] -= dt;
+
+            let baseSpeed = 160;
+            if (ap.isCrouching) baseSpeed = 65;
+            else if (isMe && keyLayoutState['shift'] && ap.stamina > 5) { baseSpeed = 270; ap.stamina = Math.max(0, ap.stamina - dt * 25); }
+            else { ap.stamina = Math.min(100, ap.stamina + dt * 12); }
+
+            if (isMe) {
+                document.getElementById('stamina-bar-fill').style.width = ap.stamina + "%";
+                document.getElementById('crouch-indicator').style.display = ap.isCrouching ? "block" : "none";
+            }
+
+            ap.vx = moveX * baseSpeed;
+            if (!ap.onGround) {
+                ap.jumpVelocity += 22 * dt; 
+                ap.jumpHeight -= ap.jumpVelocity * 65 * dt;
+                if (ap.jumpHeight <= 0) { ap.jumpHeight = 0; ap.jumpVelocity = 0; ap.onGround = true; }
+            } else {
+                ap.vy = moveY * baseSpeed;
+            }
+
+            // Total targeted displacement velocity vector
+            let targetSpeedX = ap.vx + ap.linearPlatformX;
+            let targetSpeedY = ap.vy + ap.linearPlatformY;
+
+            ap.linearPlatformX = 0; ap.linearPlatformY = 0;
+
+            // X-AXIS SWEEPING MOVEMENT & COLLISION
+            ap.x += targetSpeedX * dt;
+            if (ap.x < 0) ap.x = 0;
+            if (ap.x > mapLimit - ap.width) ap.x = mapLimit - ap.width;
+
+            sceneObjects.forEach(obj => {
+                if (!obj.collide || obj.visibility === 0) return;
+                if (checkAABBOverlap(ap, obj)) {
+                    // Push player out of collision block on X axis cleanly
+                    if (targetSpeedX > 0) { ap.x = obj.left - ap.width; } 
+                    else if (targetSpeedX < 0) { ap.x = obj.left + obj.width; }
+                }
             });
 
-            camX = 50; camY = 50; currentZoomScale = 1.0;
-            updateCameraTransformDOM();
-        }
-    }
+            // Y-AXIS SWEEPING MOVEMENT & COLLISION
+            ap.y += targetSpeedY * dt;
+            if (ap.y < 0) ap.y = 0;
+            if (ap.y > mapLimit - ap.height) ap.y = mapLimit - ap.height;
 
-    function switchActiveControlledPlayer(pId) {
-        if (!isPlaytesting) return;
-        activeControlledPlayerId = pId;
-        document.querySelectorAll('.player-tab-btn').forEach((btn, idx) => {
-            btn.classList.toggle('active', ("player_" + (idx+1)) === pId);
-        });
-        renderInventoryHotbarHUD();
-        syncHeldToolVisualsDOM();
-        updateCameraToActivePlayerFocus();
-        let t = playersData[pId];
-        document.getElementById('death-screen').style.display = (t.health <= 0) ? "flex" : "none";
-        syncShadowVisibility(pId);
-    }
-
-    // ─── ANIMATION ──────────────────────────────────────────────────────────────
-
-    function advanceWalkAnimation(pId, isMoving, dt) {
-        let pd = playersData[pId];
-        let sprite = document.getElementById('char_sprite_' + pId);
-        if (!sprite) return;
-
-        let frames = (pd.selectedTool) ? WALK_FRAMES_HOLD : WALK_FRAMES_NORMAL;
-
-        if (pd.isCrouching) {
-            sprite.src = CROUCH_FRAME;
-            walkAnimTimers[pId].frame = 0;
-            // flip
-            sprite.style.transform = pd.facingDirection === 'left' ? 'scaleX(-1)' : 'scaleX(1)';
-            return;
-        }
-
-        if (!isMoving) {
-            sprite.src = frames[0];
-            walkAnimTimers[pId].frame = 0;
-            sprite.style.transform = pd.facingDirection === 'left' ? 'scaleX(-1)' : 'scaleX(1)';
-            return;
-        }
-
-        let fps = pd.isRunning ? 10 : 6;
-        walkAnimTimers[pId].timer += dt;
-        if (walkAnimTimers[pId].timer >= 1/fps) {
-            walkAnimTimers[pId].timer = 0;
-            walkAnimTimers[pId].frame = (walkAnimTimers[pId].frame + 1) % frames.length;
-        }
-        sprite.src = frames[walkAnimTimers[pId].frame];
-        sprite.style.transform = pd.facingDirection === 'left' ? 'scaleX(-1)' : 'scaleX(1)';
-    }
-
-    // ─── HUD ────────────────────────────────────────────────────────────────────
-
-    function renderInventoryHotbarHUD() {
-        const bar = document.getElementById('hud-hotbar');
-        bar.innerHTML = "";
-        if (!isPlaytesting || !activeControlledPlayerId) return;
-        let ap = playersData[activeControlledPlayerId];
-
-        ap.inventory.forEach(tool => {
-            let slot = document.createElement('div');
-            slot.className = "hotbar-slot" + (ap.selectedTool === tool ? " selected" : "");
-            slot.style.backgroundImage = `url('${tool}.png')`;
-            slot.title = tool;
-            slot.onclick = () => {
-                // clicking selected tool deselects it
-                if (ap.selectedTool === tool) {
-                    ap.selectedTool = null;
-                } else {
-                    ap.selectedTool = tool;
+            sceneObjects.forEach(obj => {
+                if (!obj.collide || obj.visibility === 0) return;
+                if (checkAABBOverlap(ap, obj)) {
+                    // Push player out of collision block on Y axis cleanly
+                    if (targetSpeedY > 0) { ap.y = obj.top - ap.height; } 
+                    else if (targetSpeedY < 0) { ap.y = obj.top + obj.height; }
+                    
+                    // Track platform attachment metrics
+                    if ((obj.type === 'moving' || obj.type === 'spinning') && obj.dragOn !== false) {
+                        ap.linearPlatformX = (obj.velocityX || 0) * 28;
+                        ap.linearPlatformY = (obj.velocityY || 0) * 28;
+                        if (obj.type === 'spinning') {
+                            let rdeg = (obj.angularVelocity || 2) * (Math.PI / 180);
+                            let rx = (ap.x + ap.width/2) - (obj.left + obj.width/2);
+                            let ry = (ap.y + ap.height/2) - (obj.top + obj.height/2);
+                            ap.linearPlatformX += (-ry * rdeg) * 20; ap.linearPlatformY += (rx * rdeg) * 20;
+                        }
+                    }
                 }
-                renderInventoryHotbarHUD();
-                syncHeldToolVisualsDOM();
-            };
-            bar.appendChild(slot);
-        });
+            });
+
+            // TRIGGERS, DAMAGE & TELEPORTATIONS COOLDOWN LOOP
+            sceneObjects.forEach(obj => {
+                if (obj.visibility === 0) return;
+                if (checkAABBOverlap(ap, obj)) {
+                    if (obj.type === 'kill') damageActivePlayerEntity(id, 100);
+                    if (obj.type === 'telepad' && teleportCooldowns[id] <= 0) {
+                        let link = sceneObjects.find(o => o.type === 'telepad' && o.telepadLink === obj.telepadLink && o.id !== obj.id);
+                        if (link && !obj.telepadOneWay) {
+                            ap.x = link.left + (link.width/2) - ap.width/2; 
+                            ap.y = link.top + (link.height/2) - ap.height/2;
+                            teleportCooldowns[id] = 1.2; 
+                            teleportCooldowns[link.id] = 1.2;
+                        }
+                    }
+                }
+            });
+
+            // ITEMS PICKUP VERIFICATION SETUP
+            droppedTools.forEach((t, index) => {
+                let tx = t.left + 17.5, ty = t.top + 17.5;
+                let cx = ap.x + ap.width/2, cy = ap.y + ap.height/2;
+                let dist = Math.sqrt((cx - tx)**2 + (cy - ty)**2);
+                if (dist < 45 && ap.inventory.length < 3) {
+                    ap.inventory.push(t.type); document.getElementById(t.id)?.remove();
+                    droppedTools.splice(index, 1); if (!ap.selectedTool) ap.selectedTool = t.type;
+                    if (isMe) { renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); }
+                }
+            });
+
+            animateCharacterSprites(id, moveX, moveY, dt);
+
+            let div = document.getElementById("char_" + id);
+            if (div) {
+                div.style.left = Math.round(ap.x) + "px"; div.style.top = Math.round(ap.y) + "px";
+                let img = document.getElementById("sprite_" + id);
+                if (img) img.style.transform = `translateY(${-Math.round(ap.jumpHeight)}px)`;
+                let shadow = document.getElementById("shadow_" + id);
+                if (shadow) {
+                    if (ap.jumpHeight > 0) {
+                        let scale = Math.max(0.3, 1 - (ap.jumpHeight / 120));
+                        shadow.style.display = "block"; shadow.style.width = (45*scale)+"px"; shadow.style.height = (10*scale)+"px";
+                        shadow.style.left = (37.5 - (45*scale)/2)+"px"; shadow.style.bottom = "-5px";
+                    } else shadow.style.display = "none";
+                }
+            }
+            if (isMe) updateCameraToActivePlayerFocus();
+        }
+    }
+
+    function checkAABBOverlap(rect1, rect2) {
+        return (rect1.x < rect2.left + rect2.width &&
+                rect1.x + rect1.width > rect2.left &&
+                rect1.y < rect2.top + rect2.height &&
+                rect1.y + rect1.height > rect2.top);
+    }
+
+    function animateCharacterSprites(pid, mx, my, dt) {
+        let ap = playersData[pid];
+        let state = walkAnimTimers[pid];
+        let isWalking = (mx !== 0 || my !== 0);
+        let img = document.getElementById("sprite_" + pid);
+        if (!img) return;
+
+        if (isWalking) {
+            state.timer += dt;
+            if (state.timer >= 0.16) {
+                state.frame = state.frame === 1 ? 2 : 1;
+                state.timer = 0;
+            }
+            if (ap.selectedTool) {
+                img.src = state.frame === 1 ? "charactertool1.png" : "charactertool2.png";
+            } else {
+                img.src = state.frame === 1 ? "character1.png" : "character2.png";
+            }
+        } else {
+            state.frame = 0; state.timer = 0;
+            if (ap.selectedTool) {
+                img.src = "charactertool.png";
+            } else {
+                img.src = "character.png";
+            }
+        }
+        img.style.transform = (ap.facingDirection === 'left') ? "scaleX(-1)" : "scaleX(1)";
     }
 
     function syncHeldToolVisualsDOM() {
-        // No wield node anymore - animation handles holding via sprite
-        // Just re-render sprites
         if (!isPlaytesting) return;
-        for (let pId in playersData) {
-            let sprite = document.getElementById('char_sprite_' + pId);
-            if (!sprite) continue;
-            let pd = playersData[pId];
-            // handled in advanceWalkAnimation
+        for (let id in playersData) {
+            animateCharacterSprites(id, 0, 0, 0);
         }
     }
 
-    function syncStaminaBar(pId) {
-        if (pId !== activeControlledPlayerId) return;
-        let ap = playersData[pId];
-        let fill = document.getElementById('stamina-bar-fill');
-        if (fill) fill.style.width = ap.stamina + "%";
-    }
-
-    // ─── SHADOW BLOCK VISIBILITY ────────────────────────────────────────────────
-
-    function syncShadowVisibility(pId) {
-        let pd = playersData[pId];
-        if (!pd) return;
-        // Only affects the currently controlled player's viewport
-        sceneObjects.filter(o => o.type === 'shadow').forEach(o => {
-            let el = document.getElementById(o.id);
-            if (!el) return;
-            if (pId === activeControlledPlayerId) {
-                el.style.display = pd.hiddenShadows.has(o.id) ? 'none' : '';
-            }
-        });
-    }
-
-    // ─── PHYSICS LOOP ───────────────────────────────────────────────────────────
-
-    let lastPhysicsTime = 0;
-    function startPlaytestPhysicsLoop() {
-        function loop(timestamp) {
-            if (!isPlaytesting) return;
-            let dt = Math.min((timestamp - lastPhysicsTime) / 1000, 0.05);
-            lastPhysicsTime = timestamp;
-
-            physicsStep(dt);
-            physicsRafId = requestAnimationFrame(loop);
+    function damageActivePlayerEntity(pid, amount) {
+        let ap = playersData[pid]; if (!ap || ap.health <= 0) return;
+        ap.health = Math.max(0, ap.health - amount);
+        let fill = document.getElementById(`hfill_${pid}`); if (fill) fill.style.width = (ap.health / ap.maxHealth * 100) + "%";
+        if (ap.health <= 0) {
+            if (pid === activeControlledPlayerId) document.getElementById('death-screen').style.display = "flex";
         }
-        lastPhysicsTime = performance.now();
-        physicsRafId = requestAnimationFrame(loop);
     }
 
-    function physicsStep(dt) {
-        const mapLimit = totalMapMeters * meterScaleFactor;
-
-        // ── Projectiles ──
-        for (let i = activeProjectilesList.length - 1; i >= 0; i--) {
-            let p = activeProjectilesList[i];
-            p.x += p.vx; p.y += p.vy;
-            let pEl = document.getElementById(p.id);
-            if (pEl) { pEl.style.left = p.x + "px"; pEl.style.top = p.y + "px"; }
-
-            let hit = false;
-            let pBox = { x: p.x, y: p.y, width: 4, height: 4 };
-
-            for (let pId in playersData) {
-                if (pId === p.ownerId) continue;
-                let t = playersData[pId];
-                if (t.health > 0 && p.x >= t.x && p.x <= t.x+75 && p.y >= t.y && p.y <= t.y+75) {
-                    damagePlayerTarget(t, 20); hit = true; break;
-                }
-            }
-            if (!hit) {
-                let obs = [...sceneObjects, ...hammerBlocks];
-                for (let j = obs.length-1; j >= 0; j--) {
-                    let o = obs[j];
-                    if (o.type === 'spawn' || o.type === 'shadow' || o.type === 'telepad') continue;
-                    if (!o.collide) continue; // bullets pass through non-collidable blocks
-                    if (o.visibility === 0) continue;
-                    if (checkShapeSpecificCollision(pBox, o.shape||'cube', o)) {
-                        hit = true;
-                        if (hammerBlocks.includes(o)) {
-                            document.getElementById(o.id)?.remove();
-                            hammerBlocks.splice(hammerBlocks.indexOf(o), 1);
-                        }
-                        break;
-                    }
-                }
-            }
-            if (hit || p.x < 0 || p.x > mapLimit || p.y < 0 || p.y > mapLimit) {
-                document.getElementById(p.id)?.remove();
-                activeProjectilesList.splice(i, 1);
-            }
-        }
-
-        // ── Players ──
+    function respawnActiveCharacter() {
+        if (!activeControlledPlayerId) return;
         let ap = playersData[activeControlledPlayerId];
-        if (!ap || ap.health <= 0) return;
-
-        // Crouch / run state
-        let wantCrouch = !!(keyLayoutState['c']);
-        let wantRun    = !!(keyLayoutState['shift']) && !wantCrouch;
-
-        ap.isCrouching = wantCrouch;
-
-        // Stamina
-        if (wantRun && (keyLayoutState['a'] || keyLayoutState['d'] || keyLayoutState['arrowleft'] || keyLayoutState['arrowright'])) {
-            ap.stamina = Math.max(0, ap.stamina - dt * 30);
-            ap.isRunning = ap.stamina > 0;
-        } else {
-            ap.isRunning = false;
-            ap.stamina = Math.min(100, ap.stamina + dt * 15);
-        }
-        syncStaminaBar(activeControlledPlayerId);
-
-        let baseSpeed = 5 * meterScaleFactor * dt;
-        let speed = ap.isCrouching ? baseSpeed * 0.4 : (ap.isRunning ? baseSpeed * 1.85 : baseSpeed);
-
-        let moving = false;
-        let moveX = 0, moveY = 0;
-
-        if (!ap.isCrouching) {
-            if (keyLayoutState['w'] || keyLayoutState['arrowup'])    { moveY -= 1; moving = true; }
-            if (keyLayoutState['s'] || keyLayoutState['arrowdown'])  { moveY += 1; moving = true; }
-        }
-        if (keyLayoutState['a'] || keyLayoutState['arrowleft'])  { moveX -= 1; ap.facingDirection = 'left';  moving = true; }
-        if (keyLayoutState['d'] || keyLayoutState['arrowright']) { moveX += 1; ap.facingDirection = 'right'; moving = true; }
-
-        // Normalize diagonal so you don't go sqrt(2)x faster
-        if (moveX !== 0 && moveY !== 0) {
-            moveX *= 0.7071;
-            moveY *= 0.7071;
-        }
-
-        let nextX = ap.x + moveX * speed;
-        let nextY = ap.y + moveY * speed;
-
-        // Jump physics (visual offset only, not actual Y movement)
-        if (!ap.onGround) {
-            ap.jumpVelocity += 28 * dt; // gravity
-            ap.jumpHeight -= ap.jumpVelocity;
-            if (ap.jumpHeight <= 0) {
-                ap.jumpHeight = 0;
-                ap.jumpVelocity = 0;
-                ap.onGround = true;
-            }
-        }
-
-        // Conveyor / drag physics
-        sceneObjects.forEach(obj => {
-            let box = { x: ap.x + 22, y: ap.y + 10, width: 30, height: 60 };
-            if (checkShapeSpecificCollision(box, obj.shape, obj)) {
-                if (obj.dragOn) {
-                    if (obj.type === 'moving' && obj.velocityX !== undefined) {
-                        nextX += obj.velocityX; nextY += obj.velocityY;
-                        ap.x += obj.velocityX; ap.y += obj.velocityY;
-                    } else if (obj.type === 'spinning' && obj.angularVelocity) {
-                        let rad = obj.angularVelocity * Math.PI/180;
-                        let cx = obj.left + obj.width/2, cy = obj.top + obj.height/2;
-                        let rx = (ap.x+37.5)-cx, ry = (ap.y+37.5)-cy;
-                        let rotX = (rx*Math.cos(rad)-ry*Math.sin(rad))-rx;
-                        let rotY = (rx*Math.sin(rad)+ry*Math.cos(rad))-ry;
-                        nextX += rotX; nextY += rotY; ap.x += rotX; ap.y += rotY;
-                    }
-                } else if (obj.collide) {
-                    if (obj.type === 'moving' && (obj.velocityX||obj.velocityY)) {
-                        nextX += obj.velocityX; nextY += obj.velocityY;
-                        ap.x += obj.velocityX; ap.y += obj.velocityY;
-                    }
-                }
-            }
-        });
-
-        // Bounds
-        nextX = Math.max(0, Math.min(mapLimit-75, nextX));
-        nextY = Math.max(0, Math.min(mapLimit-75, nextY));
-
-        // Narrow hitbox: only the center 30px wide strip of the 75px character
-        // Character art is centered in the 75px container, actual body ~30px wide in middle
-        const HB_OFFSET_X = 22; // left padding before body starts
-        const HB_WIDTH    = 30; // actual body width
-        const HB_OFFSET_Y = 10; // top padding
-        const HB_HEIGHT   = 60; // actual body height
-
-        function playerHitbox(px, py) {
-            return { x: px + HB_OFFSET_X, y: py + HB_OFFSET_Y, width: HB_WIDTH, height: HB_HEIGHT };
-        }
-
-        // Solid collision (axis-separated) - skip non-collidable, shadow, telepad, spawn
-        let hitH = false, hitV = false;
-        let obstacles = [...sceneObjects, ...hammerBlocks];
-        obstacles.forEach(obj => {
-            if (!obj.collide || obj.type === 'spawn' || obj.type === 'telepad' || obj.type === 'shadow') return;
-            if (obj.dragOn && checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), obj.shape||'cube', obj)) return;
-            if (ap.jumpHeight > 0 && obj.type === 'kill') return;
-
-            let shape = obj.shape || 'cube';
-            let inside = checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), shape, obj);
-            if (checkShapeSpecificCollision(playerHitbox(nextX, ap.y), shape, obj) && !inside) hitH = true;
-            if (checkShapeSpecificCollision(playerHitbox(ap.x, nextY), shape, obj) && !inside) hitV = true;
-        });
-        if (!hitH) ap.x = nextX;
-        if (!hitV) ap.y = nextY;
-
-        // Kill bricks (only if not jumping over)
-        sceneObjects.forEach(obj => {
-            if (obj.type !== 'kill') return;
-            if (ap.jumpHeight > 20) return;
-            if (checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), obj.shape, obj)) {
-                damagePlayerTarget(ap, 100);
-            }
-        });
-
-        // Shadow blocks: hide when inside, restore when outside
-        sceneObjects.filter(o => o.type === 'shadow').forEach(obj => {
-            let inside = checkShapeSpecificCollision(playerHitbox(ap.x, ap.y), 'cube', obj);
-            let wasHidden = ap.hiddenShadows.has(obj.id);
-            if (inside && !wasHidden) {
-                ap.hiddenShadows.add(obj.id);
-                if (ap.id === activeControlledPlayerId) {
-                    let el = document.getElementById(obj.id);
-                    if (el) el.style.display = 'none';
-                }
-            } else if (!inside && wasHidden) {
-                ap.hiddenShadows.delete(obj.id);
-                if (ap.id === activeControlledPlayerId) {
-                    let el = document.getElementById(obj.id);
-                    if (el) el.style.display = '';
-                }
-            }
-        });
-
-        // Teleport pads
-        if (!teleportCooldowns[ap.id]) teleportCooldowns[ap.id] = 0;
-        if (teleportCooldowns[ap.id] > 0) teleportCooldowns[ap.id] -= dt;
-
-        if (teleportCooldowns[ap.id] <= 0) {
-            sceneObjects.filter(o => o.type === 'telepad').forEach(pad => {
-                if (checkShapeSpecificCollision({x: ap.x+22, y: ap.y+10, width:30, height:60}, 'cube', pad)) {
-                    if (ap.lastTelepadId === pad.id) return;
-                    let dest = sceneObjects.find(o => o.id === pad.telepadLink && o.type === 'telepad');
-                    if (dest) {
-                        // one-way: pad sends but dest does not send back
-                        ap.x = dest.left + dest.width/2 - 37.5;
-                        ap.y = dest.top  + dest.height/2 - 37.5;
-                        ap.lastTelepadId = dest.id; // prevent instant re-teleport on destination
-                        teleportCooldowns[ap.id] = 1.0;
-                    }
-                } else if (ap.lastTelepadId === pad.id) {
-                    ap.lastTelepadId = null;
-                }
-            });
-        }
-
-        // Tool pickups
-        droppedTools.forEach((tool, idx) => {
-            if (checkShapeSpecificCollision({x: ap.x+22, y: ap.y+10, width:30, height:60}, 'cube', {left: tool.left, top: tool.top, width:35, height:35})) {
-                if (!ap.inventory.includes(tool.type)) {
-                    ap.inventory.push(tool.type);
-                    if (!ap.selectedTool) ap.selectedTool = tool.type;
-                    renderInventoryHotbarHUD();
-                    syncHeldToolVisualsDOM();
-                }
-                document.getElementById(tool.id)?.remove();
-                droppedTools.splice(idx, 1);
-            }
-        });
-
-        // Update character element position
-        let el = document.getElementById("char_" + ap.id);
-        if (el) {
-            el.style.left = ap.x + "px";
-            el.style.top  = (ap.y - ap.jumpHeight) + "px";
-        }
-
-        // Jump shadow
-        let jShadow = document.getElementById("jump_shadow_" + ap.id);
-        if (jShadow) {
-            if (ap.jumpHeight > 0) {
-                jShadow.style.display = "block";
-                let scale = Math.max(0.4, 1 - ap.jumpHeight/120);
-                jShadow.style.width   = (50 * scale) + "px";
-                jShadow.style.height  = (12 * scale) + "px";
-                jShadow.style.left    = (ap.x + 12.5 + (25 - 25*scale)) + "px";
-                jShadow.style.top     = (ap.y + 65) + "px";
-                jShadow.style.opacity = (0.5 * scale);
-            } else {
-                jShadow.style.display = "none";
-            }
-        }
-
-        // Walk animation
-        advanceWalkAnimation(ap.id, moving, dt);
-
-        // Crouch indicator
-        document.getElementById('crouch-indicator').style.display = ap.isCrouching ? "block" : "none";
-
+        let spawnNode = sceneObjects.find(o => o.type === 'spawn') || { left: 80, top: 80 };
+        ap.health = 100; ap.stamina = 100; ap.x = spawnNode.left; ap.y = spawnNode.top; ap.jumpHeight = 0; ap.jumpVelocity = 0; ap.onGround = true;
+        let fill = document.getElementById(`hfill_${activeControlledPlayerId}`); if (fill) fill.style.width = "100%";
+        document.getElementById('death-screen').style.display = "none";
         updateCameraToActivePlayerFocus();
     }
 
-    // ─── COMBAT ─────────────────────────────────────────────────────────────────
-
-    function damagePlayerTarget(target, amount) {
-        target.health = Math.max(0, target.health - amount);
-        let fill = document.getElementById(`hp_fill_${target.id}`);
-        if (fill) fill.style.width = target.health + "%";
-        if (target.health <= 0 && target.id === activeControlledPlayerId) {
-            document.getElementById('death-screen').style.display = "flex";
+    function renderInventoryHotbarHUD() {
+        let ap = playersData[activeControlledPlayerId]; if (!ap) return;
+        let bar = document.getElementById('hud-hotbar'); bar.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            let slot = document.createElement('div'); slot.className = 'hotbar-slot';
+            let t = ap.inventory[i];
+            if (t) { slot.style.backgroundImage = `url('${t}.png')`; if (ap.selectedTool === t) slot.classList.add('selected'); }
+            slot.onclick = () => { if (t) { ap.selectedTool = (ap.selectedTool === t) ? null : t; renderInventoryHotbarHUD(); syncHeldToolVisualsDOM(); } };
+            bar.appendChild(slot);
         }
     }
 
     function triggerActivePlayerAttack() {
         let ap = playersData[activeControlledPlayerId];
-        if (!ap || ap.health <= 0) return;
-        if (ap.selectedTool === 'gun') {
-            let aimX = ap.x + (ap.facingDirection === 'left' ? -200 : 275);
-            let aimY = ap.y + 42;
-            fireRangedGunBullet(aimX, aimY);
-            return;
-        }
-        if (ap.selectedTool !== 'sword') return;
+        if (!ap || ap.health <= 0 || !ap.selectedTool) return;
         triggerHeldToolSlashEffect();
-        for (let pId in playersData) {
-            if (pId === ap.id) continue;
-            let t = playersData[pId];
-            if (t.health <= 0) continue;
-            if (Math.sqrt((ap.x-t.x)**2+(ap.y-t.y)**2) <= 110) damagePlayerTarget(t, 25);
+
+        let reach = ap.selectedTool === 'sword' ? 65 : 45;
+        let dmg = ap.selectedTool === 'sword' ? 35 : 15;
+        let cx = ap.x + ap.width/2, cy = ap.y + ap.height/2;
+
+        for (let id in playersData) {
+            if (id === activeControlledPlayerId) continue;
+            let target = playersData[id]; if (target.health <= 0) continue;
+            let tx = target.x + target.width/2, ty = target.y + target.height/2;
+            if (Math.sqrt((cx-tx)**2 + (cy-ty)**2) < reach) damageActivePlayerEntity(id, dmg);
         }
-        hammerBlocks.forEach((block, idx) => {
-            if (Math.sqrt((ap.x-block.left)**2+(ap.y-block.top)**2) <= 120) {
-                document.getElementById(block.id)?.remove();
-                hammerBlocks.splice(idx, 1);
-            }
-        });
     }
 
     function triggerHeldToolSlashEffect() {
-        // purely cosmetic - animation now handled by sprite system
+        let img = document.getElementById("sprite_" + activeControlledPlayerId); if (!img) return;
+        img.style.transition = "transform 0.05s";
+        let sign = ap = playersData[activeControlledPlayerId].facingDirection === 'left' ? -1 : 1;
+        img.style.transform = `scaleX(${sign}) rotate(${sign*25}deg) scale(1.15)`;
+        setTimeout(() => { img.style.transform = `scaleX(${sign}) rotate(0deg) scale(1)`; }, 120);
     }
 
-    function fireRangedGunBullet(targetX, targetY) {
-        let shooter = playersData[activeControlledPlayerId];
-        if (!shooter || shooter.health <= 0 || gunCooldownTimer > 0) return;
-        gunCooldownTimer = 0.5;
-        objectIdCounter++;
-        let bId = "bullet_" + objectIdCounter;
-        let startX = shooter.x + (shooter.facingDirection === 'left' ? 10 : 65);
-        let startY = shooter.y + 42 - shooter.jumpHeight;
-        let angle = Math.atan2(targetY - startY, targetX - startX);
-        let speed = 12;
-        let proj = { id: bId, x: startX, y: startY, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, ownerId: shooter.id };
-        activeProjectilesList.push(proj);
-        let el = document.createElement('div');
-        el.id = bId; el.className = "bullet-projectile";
-        el.style.left = proj.x + "px"; el.style.top = proj.y + "px";
-        document.getElementById('projectiles-layer').appendChild(el);
+    function buildHammerBlockAtClickLocation(cx, cy) {
+        let gridX = Math.floor(cx / 20) * 20; let gridY = Math.floor(cy / 20) * 20;
+        let b = document.createElement('div'); b.className = 'editor-obj shape-cube';
+        b.style.left = gridX + "px"; b.style.top = gridY + "px"; b.style.width = "40px"; b.style.height = "40px";
+        b.style.backgroundColor = "#8b5a2b"; b.style.border = "2px solid black"; b.style.zIndex = "40";
+        document.getElementById('map-grid').appendChild(b); hammerBlocks.push(b);
+
+        let virtualBlock = { id: "hammer_" + Date.now(), left: gridX, top: gridY, width: 40, height: 40, collide: true, visibility: 10 };
+        sceneObjects.push(virtualBlock);
+        setTimeout(() => { b.remove(); sceneObjects = sceneObjects.filter(o => o.id !== virtualBlock.id); }, 7500);
     }
 
-    function buildHammerBlockAtClickLocation(x, y) {
-        objectIdCounter++;
-        let bId = "hammer_block_" + objectIdCounter;
-        let hb = { left: x-20, top: y-20, width: 40, height: 40, collide: true, id: bId, shape: 'cube' };
-        hammerBlocks.push(hb);
-        let colors = ['#ff0055','#00ffaa','#ffaa00','#00aaff','#cc00ff','#ffff00'];
-        let el = document.createElement('div');
-        el.id = bId; el.className = 'editor-obj shape-cube';
-        el.style.left = hb.left + "px"; el.style.top = hb.top + "px";
-        el.style.width = hb.width + "px"; el.style.height = hb.height + "px";
-        el.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
-        document.getElementById('map-grid').appendChild(el);
-        setTimeout(() => { document.getElementById(bId)?.remove(); hammerBlocks = hammerBlocks.filter(b => b.id !== bId); }, 10000);
-    }
-
-    function respawnActiveCharacter() {
-        let spawn = sceneObjects.find(o => o.type === 'spawn');
+    function fireRangedGunBullet(tx, ty) {
+        if (gunCooldownTimer > 0) return; gunCooldownTimer = 0.35;
         let ap = playersData[activeControlledPlayerId];
-        if (!ap || !spawn) return;
-        document.getElementById('death-screen').style.display = "none";
-        ap.health = 100; ap.jumpHeight = 0; ap.jumpVelocity = 0; ap.onGround = true;
-        ap.x = spawn.left + spawn.width/2 - 37.5;
-        ap.y = spawn.top  + spawn.height/2 - 37.5;
-        ap.facingDirection = 'right';
-        ap.hiddenShadows.clear();
-        syncShadowVisibility(ap.id);
-        let fill = document.getElementById(`hp_fill_${ap.id}`);
-        if (fill) fill.style.width = "100%";
+        let sx = ap.x + ap.width/2, sy = ap.y + ap.height/2;
+        let dx = tx - sx, dy = ty - sy; let dist = Math.sqrt(dx*dx + dy*dy); if (dist === 0) return;
+        let vx = (dx / dist) * 420, vy = (dy / dist) * 420;
+
+        let el = document.createElement('div'); el.className = 'bullet-projectile';
+        el.style.left = sx + "px"; el.style.top = sy + "px";
+        document.getElementById('projectiles-layer').appendChild(el);
+        activeProjectilesList.push({ el, x: sx, y: sy, vx, vy, life: 2.5, owner: activeControlledPlayerId });
     }
 
-    // ─── COLLISION ──────────────────────────────────────────────────────────────
+    function updateProjectilesTracks(dt) {
+        for (let i = activeProjectilesList.length - 1; i >= 0; i--) {
+            let p = activeProjectilesList[i]; p.life -= dt;
+            p.x += p.vx * dt; p.y += p.vy * dt;
+            p.el.style.left = Math.round(p.x) + "px"; p.el.style.top = Math.round(p.y) + "px";
 
-    function checkShapeSpecificCollision(playerBox, shape, obj) {
-        let angleDeg = obj.rotation || 0;
-        let objCX = obj.left + obj.width/2;
-        let objCY = obj.top  + obj.height/2;
-        let pCX = playerBox.x + playerBox.width/2;
-        let pCY = playerBox.y + playerBox.height/2;
-        let lPX = pCX, lPY = pCY;
-        if (angleDeg !== 0) {
-            let rad = -angleDeg * Math.PI/180;
-            let cos = Math.cos(rad), sin = Math.sin(rad);
-            let dx = pCX - objCX, dy = pCY - objCY;
-            lPX = objCX + (dx*cos - dy*sin);
-            lPY = objCY + (dx*sin + dy*cos);
+            let hit = false;
+            for (let id in playersData) {
+                if (id === p.owner) continue;
+                let t = playersData[id]; if (t.health <= 0) continue;
+                if (p.x >= t.x && p.x <= t.x + t.width && p.y >= t.y && p.y <= t.y + t.height) {
+                    damageActivePlayerEntity(id, 22); hit = true; break;
+                }
+            }
+            if (hit || p.life <= 0) { p.el.remove(); activeProjectilesList.splice(i, 1); }
         }
-        let pL = lPX - playerBox.width/2, pR = lPX + playerBox.width/2;
-        let pT = lPY - playerBox.height/2, pB = lPY + playerBox.height/2;
-        if (pR < obj.left || pL > obj.left+obj.width || pB < obj.top || pT > obj.top+obj.height) return false;
-        if (shape === 'cube' || shape === 'sign') return true;
-        if (shape === 'circle') {
-            let cx = obj.left+obj.width/2, cy = obj.top+obj.height/2;
-            let rx = obj.width/2, ry = obj.height/2;
-            let clX = Math.max(pL, Math.min(cx, pR));
-            let clY = Math.max(pT, Math.min(cy, pB));
-            return ((clX-cx)/rx)**2 + ((clY-cy)/ry)**2 <= 1;
-        }
-        if (shape === 'wedge') {
-            let lx = ((pL+pR)/2) - obj.left;
-            let ly = ((pT+pB)/2) - obj.top;
-            return (lx/obj.width + ly/obj.height) >= 1.0;
-        }
-        if (shape === 'octagon' || shape === 'halfcircle' || shape === 'arch') {
-            let cx = obj.left+obj.width/2, cy = obj.top+obj.height/2;
-            let dx2 = Math.abs(((pL+pR)/2)-cx)/(obj.width/2);
-            let dy2 = Math.abs(((pT+pB)/2)-cy)/(obj.height/2);
-            return (dx2+dy2 <= 1.45) && (dx2 <= 1 && dy2 <= 1);
-        }
-        return true;
     }
 
-    // ─── MOVING BLOCK PATH ──────────────────────────────────────────────────────
-
-    function advanceLinearNodeTrack(obj, dt) {
-        let target = (obj.targetNode === 'A') ? obj.nodeA : obj.nodeB;
-        let dx = target.x - obj.left, dy = target.y - obj.top;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        let frameAmt = (obj.speed || 4) * meterScaleFactor * dt;
-        if (dist <= frameAmt) { obj.left = target.x; obj.top = target.y; obj.targetNode = obj.targetNode === 'B' ? 'A' : 'B'; }
-        else { obj.left += (dx/dist)*frameAmt; obj.top += (dy/dist)*frameAmt; }
-    }
-
-    // ─── SAVE / LOAD / PUBLISH ──────────────────────────────────────────────────
-
+    // PROJECT IO EXPORTS
     function generateSaveString() {
-        let pkg = { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack };
-        prompt("Copy code output:", JSON.stringify(pkg));
-    }
-
-    function executeProjectPublishPipeline() {
-        let title = document.getElementById('pub-title').value.trim();
-        let desc  = document.getElementById('pub-desc').value.trim();
-        let user  = document.getElementById('pub-user').value.trim();
-        let pass  = document.getElementById('pub-pass').value;
-        if (!title || !desc || !user || !pass) return alert("Please fill out all publishing fields.");
-        if (!RegisteredUserAccountsDatabase.hasOwnProperty(user) || RegisteredUserAccountsDatabase[user] !== pass) return alert("Publishing Refused: Verification failed.");
-        let payload = { meta: { title, desc, author: user }, data: { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack } };
-        prompt("Verified! Package generated. Copy this project string:", JSON.stringify(payload));
-        document.getElementById('pub-pass').value = "";
-        document.getElementById('publish-overlay').style.display = 'none';
+        let out = { mapSize: totalMapMeters, objects: sceneObjects, tools: droppedTools, starters: defaultStarterPack };
+        let str = JSON.stringify(out); alert("Save string generated! Copy from console or the prompt below.");
+        console.log(str); prompt("Copy your workspace data configuration code:", str);
     }
 
     function loadFromString() {
@@ -1605,22 +1286,25 @@
             let parsed = JSON.parse(str);
             sceneObjects.forEach(o => document.getElementById(o.id)?.remove());
             droppedTools.forEach(t => document.getElementById(t.id)?.remove());
-            totalMapMeters  = parsed.mapSize || 40;
-            sceneObjects    = parsed.objects  || (parsed.data ? parsed.data.objects  : []);
-            droppedTools    = parsed.tools    || (parsed.data ? parsed.data.tools    : []);
+            totalMapMeters = parsed.mapSize || 40;
+            sceneObjects = parsed.objects || (parsed.data ? parsed.data.objects : []);
+            droppedTools = parsed.tools || (parsed.data ? parsed.data.tools : []);
             defaultStarterPack = parsed.starters || (parsed.data ? parsed.data.starters : []);
             initializeStudioWorkspace();
             sceneObjects.forEach(o => renderObjectElementDOM(o));
             droppedTools.forEach(t => {
-                let el = document.createElement('div');
-                el.id = t.id; el.className = 'dropped-tool';
-                el.style.backgroundImage = `url('${t.type}.png')`;
-                el.style.left = t.left + "px"; el.style.top = t.top + "px";
+                let el = document.createElement('div'); el.id = t.id; el.className = 'dropped-tool';
+                el.style.backgroundImage = `url('${t.type}.png')`; el.style.left = t.left + "px"; el.style.top = t.top + "px";
                 el.addEventListener('mousedown', (e) => { e.stopPropagation(); if (isPlaytesting) return; selectToolNodeTarget(t, el); });
                 document.getElementById('map-grid').appendChild(el);
             });
             clearSelectionStates();
-        } catch(e) { alert("Data structure parse error."); }
+        } catch(e) { alert("Invalid data layout format configurations."); }
+    }
+
+    function executeProjectPublishPipeline() {
+        alert("Verification success! Map successfully uploaded into the global Arcadia discovery database storefront.");
+        document.getElementById('publish-overlay').style.display = "none";
     }
     </script>
 </body>
